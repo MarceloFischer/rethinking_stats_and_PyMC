@@ -5,7 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "marimo[recommended]>=0.14.10",
     "numpy>=2.3.1",
     "polars>=1.31.0",
+    "ruff>=0.12.2",
     "scipy>=1.16.0",
 ]
