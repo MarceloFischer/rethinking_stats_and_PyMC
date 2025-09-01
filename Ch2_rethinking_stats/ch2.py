@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.10"
+__generated_with = "0.15.2"
 app = marimo.App(width="columns")
 
 
@@ -155,11 +155,7 @@ def _():
 
 @app.cell(column=1, hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        ### Exercise 1 - Medium
-        """
-    )
+    mo.md(r"""### Exercise 1 - Medium""")
     return
 
 
@@ -200,11 +196,7 @@ def _(grid_approx_ch2, mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        ### Exercise 2 - Medium
-        """
-    )
+    mo.md(r"""### Exercise 2 - Medium""")
     return
 
 
@@ -237,11 +229,7 @@ def _(grid_approx_ch2, mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        ### Exercise 3 - Medium
-        """
-    )
+    mo.md(r"""### Exercise 3 - Medium""")
     return
 
 
@@ -260,11 +248,7 @@ def _():
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        ### Exercise 4 - Medium
-        """
-    )
+    mo.md(r"""### Exercise 4 - Medium""")
     return
 
 
@@ -281,11 +265,7 @@ def _(np):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        ### Exercise 5 - Medium
-        """
-    )
+    mo.md(r"""### Exercise 5 - Medium""")
     return
 
 
@@ -302,11 +282,7 @@ def _(np):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        ### Exercise 6 - Medium
-        """
-    )
+    mo.md(r"""### Exercise 6 - Medium""")
     return
 
 
@@ -333,11 +309,7 @@ def _(np, pl):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        ### Exercise 7 - Medium
-        """
-    )
+    mo.md(r"""### Exercise 7 - Medium""")
     return
 
 
