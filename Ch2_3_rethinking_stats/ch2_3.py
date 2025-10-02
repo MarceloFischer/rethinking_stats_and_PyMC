@@ -141,6 +141,12 @@ def _(alt, binom, np, pl):
     return (grid_approx_ch2,)
 
 
+@app.cell
+def _(post_df):
+    post_df
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(
@@ -169,7 +175,7 @@ def _(grid_approx_ch2, mo):
     post_df, globe_tosses_chart = grid_approx_ch2(5, success=2, tosses=3)
 
     mo.ui.altair_chart(globe_tosses_chart)
-    return
+    return (post_df,)
 
 
 @app.cell
