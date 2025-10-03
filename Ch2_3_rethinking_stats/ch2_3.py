@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.16.1"
+__generated_with = "0.16.5"
 app = marimo.App(width="columns")
 
 
@@ -19,6 +19,8 @@ def _():
     from scipy.stats import binom
     import pymc as pm
     import altair as alt
+
+    np.random.seed = 42
     return alt, binom, mo, np, pl
 
 
@@ -165,6 +167,12 @@ def _():
 
 
 @app.cell(column=1, hide_code=True)
+def _(mo):
+    mo.md(r"""## Chapter 2""")
+    return
+
+
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Exercise 1 - Medium""")
     return
@@ -320,13 +328,71 @@ def _(np):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""## Chapter 3""")
+    return
+
+
 @app.cell
-def _():
+def _(grid_approx_ch2, np, pl):
+    _size = 10_000
+    ch3_post_df, ch3_post_chart = grid_approx_ch2(_size, "uniform", success=6, tosses=9)
+
+    # samples used for a lot of the problems
+    samples = np.random.choice(
+        ch3_post_df.select(pl.col("prob_water")).to_numpy().ravel(),
+        _size,
+        replace=True,
+        p=ch3_post_df.select(pl.col("posterior_prob")).to_numpy().ravel(),
+    )
+    return (samples,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""### Exercise 1 - Easy""")
+    return
+
+
+@app.cell
+def _(np, samples):
+    # 3E1. How much posterior probability lies below p = 0.2?
+    np.sum(samples < 0.2) / samples.size
+    return
+
+
+@app.cell
+def _(np, samples):
+    # 3E2. How much posterior probability lies above p = 0.8?
+    np.sum(samples > 0.8) / samples.size
+    return
+
+
+@app.cell
+def _(np, samples):
+    # 3E3. How much posterior probability lies between p = 0.2 and p = 0.8?
+    np.sum((0.2 < samples) & (samples < 0.8)) / samples.size
+    return
+
+
+@app.cell
+def _(np, samples):
+    # 3E4. 20% of the posterior probability lies below which value of p?
+    np.quantile(samples, 0.2)
+    return
+
+
+@app.cell
+def _(np, samples):
+    # 3E5. 20% of the posterior probability lies above which value of p?
+    np.quantile(samples, 0.8)
     return
 
 
 @app.cell
 def _():
+    # 3E6. Which values of p contain the narrowest interval equal to 66% of the posterior probability?
     return
 
 
