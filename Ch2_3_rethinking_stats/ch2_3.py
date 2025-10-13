@@ -16,7 +16,7 @@ def _():
     import polars as pl
     import numpy as np
     import scipy as sp
-    from scipy.stats import binom
+    from scipy.stats import binom, beta
     import arviz as az
     import pymc as pm
     import altair as alt
@@ -427,7 +427,8 @@ def _(mo):
 def _(grid_approx_ch2, np, pl):
     # 3M1. Suppose the globe tossing data had turned out to be 8 water in 15 tosses. Construct the posterior distribution, using grid approximation. Use the same flat prior as before.
 
-    ch3_m1_to_4_df, chart_ch3_m1_to_4 = grid_approx_ch2(p_grid_size=1_001, prior="step", success=11, tosses=15)
+
+    ch3_m1_to_4_df, chart_ch3_m1_to_4 = grid_approx_ch2(p_grid_size=1_001, prior="uniform", success=8, tosses=15)
 
     # samples used for a lot of the problems
     samples_medium = np.random.choice(
@@ -478,6 +479,283 @@ def _(ppd):
 
 @app.cell
 def _():
+    # 3M6. Suppose you want to estimate the Earth's proportion of water very precisely. Specifically, you want the 99% percentile interval of the posterior distribution of p to be only 0.05 wide. This means the distance between the upper and lower bound of the interval should be 0.05. How many times will you have to toss the globe to do this?
+
+    # DON'T KNOW
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""### Exercise - Hard""")
+    return
+
+
+@app.cell
+def _(np):
+    # The practice problems here all use the data below. These data indicate the gender (male=1, female=0) of officially reported first and second born children in 100 two-child families.
+    birth1 = np.array(
+        [
+            1,
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            1,
+            0,
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            1,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            1,
+            0,
+            1,
+            1,
+            1,
+            0,
+            1,
+            0,
+            1,
+            1,
+            0,
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            1,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            1,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            1,
+            0,
+            1,
+            1,
+            0,
+            1,
+            0,
+            1,
+            1,
+            1,
+            0,
+            1,
+            1,
+            1,
+            1,
+        ]
+    )
+
+    birth2 = np.array(
+        [
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            1,
+            1,
+            1,
+            0,
+            1,
+            1,
+            1,
+            0,
+            1,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            1,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            1,
+            1,
+            0,
+            1,
+            1,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+        ]
+    )
+
+    # So for example, the first family in the data reported a boy (1) and then a girl (0). The second family reported a girl (0) and then a boy (1). The third family reported two girls.
+    return birth1, birth2
+
+
+@app.cell
+def _(az, binom, birth1, birth2, grid_approx_ch2, np):
+    # 3H1. Using grid approximation, compute the posterior distribution for the probability of a birth being a boy. Assume a uniform prior probability. Which parameter value maximizes the posterior probability?
+
+    _tosses = birth1.size + birth2.size
+    _success = np.concat((birth1, birth2)).sum()
+
+    # using the function made for chapter 2
+    ch3_h1_df, chart_ch3_h1 = grid_approx_ch2(p_grid_size=101, prior="uniform", success=_success, tosses=_tosses)
+    # 3h1 = ch3_h1_df.filter(pl.col("posterior_prob") == pl.col("posterior_prob").max()).select("prob_water")
+
+    _p_grid = np.linspace(0, 1, 101)
+    _prior = np.ones_like(_p_grid)
+    _likelihood = binom.pmf(k=_success, n=_tosses, p=_p_grid)
+    _posterior = (_likelihood * _prior) / (_likelihood * _prior).sum()
+
+    _3h1 = _p_grid[_posterior.argmax()]
+
+    # 3H2. Using the sample function, draw 10,000 random parameter values from the posterior distribution you calculated above. Use these samples to estimate the 50%, 89%, and 97% highest posterior density intervals.
+    _samples = np.random.choice(
+        _p_grid,
+        10_000,
+        replace=True,
+        p=_posterior,
+    )
+
+    _50_hdi = az.hdi(ary=_samples, hdi_prob=0.5)
+    _89_hdi = az.hdi(ary=_samples, hdi_prob=0.89)
+    _97_hdi = az.hdi(ary=_samples, hdi_prob=0.97)
+
+    # 3H3. Use rbinom to simulate 10,000 replicates of 200 births. You should end up with 10,000 numbers, each one a count of boys out of 200 births. Compare the distribution of predicted numbers of boys to the actual count in the data (111 boys out of 200 births). There are many good ways to visualize the simulations, but the dens command (part of the rethinking package) is probably the easiest way in this case. Does it look like the model fits the data well? That is, does the distribution of predictions include the actual observation as a central, likely outcome?
+
+    _ppd = np.random.binomial(n=200, p=_samples)
+
+    # plt.hist(_ppd)
+    # plt.axvline(_success, c='r')
+    # plt.show()
+
+    # 3H4. Now compare 10,000 counts of boys from 100 simulated first borns only to the number of boys in the first births, birth1. How does the model look in this light?
+
+    # _ppd100 = np.random.binomial(n=100, p=_samples)
+    # plt.axvline(np.sum(birth1), c='r')
+    # plt.hist(_ppd100)
+    # plt.show()
+
+    # 3H5. The model assumes that sex of first and second births are independent. To check this assumption, focus now on second births that followed female first borns. Compare 10,000 simulated counts of boys to only those second births that followed girls. To do this correctly, you need to count the number of first borns who were girls and simulate that many births, 10,000 times. Compare the counts of boys in your simulations to the actual observed count of boys following girls. How does the model look in this light? Any guesses what is going on in these data?
+
+
     return
 
 
@@ -487,11 +765,6 @@ def _():
 
 
 @app.cell
-def _():
-    return
-
-
-@app.cell(column=2)
 def _():
     return
 
