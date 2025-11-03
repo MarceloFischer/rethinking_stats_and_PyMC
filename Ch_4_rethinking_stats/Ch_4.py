@@ -1,12 +1,14 @@
 import marimo
 
-__generated_with = "0.17.2"
+__generated_with = "0.17.6"
 app = marimo.App(width="columns")
 
 
 @app.cell(column=0, hide_code=True)
 def _(mo):
-    mo.md(r"""## Imports and Constants""")
+    mo.md(r"""
+    ## Imports and Constants
+    """)
     return
 
 
@@ -34,7 +36,9 @@ def _():
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""## Data Cleaning""")
+    mo.md(r"""
+    ## Data Cleaning
+    """)
     return
 
 
@@ -74,8 +78,7 @@ def _(np, plt, stats):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     ## Our Model
 
     \[
@@ -89,8 +92,7 @@ def _(mo):
     \[
     \sigma \sim \text{Uniform}(0, 50)
     \]
-    """
-    )
+    """)
     return
 
 
@@ -110,7 +112,9 @@ def _(az, stats):
 
 @app.cell(column=1, hide_code=True)
 def _(mo):
-    mo.md(r"""## Quadratic Approximation""")
+    mo.md(r"""
+    ## Quadratic Approximation
+    """)
     return
 
 
@@ -140,7 +144,9 @@ def _(az, idata_4_1):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""## Linear Prediction""")
+    mo.md(r"""
+    ## Linear Prediction
+    """)
     return
 
 
@@ -152,8 +158,7 @@ def _(data, plt):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     \begin{align*}
     h_i &\sim \text{Normal}(\mu_i, \sigma) & [\text{likelihood}] \\
     \mu_i &= \alpha + \beta w_i \quad  (\beta(x_i - \bar{x})) & [\text{linear model}] \\
@@ -166,7 +171,7 @@ def _(mo):
 
     As the image below show, this does not make a good model as it allows or negative slopes and also slopes that are clearly not resoanble.
 
-    Let's restrict beta to only positive values as: 
+    Let's restrict beta to only positive values as:
 
     \begin{align*}
     h_i &\sim \text{Normal}(\mu_i, \sigma) & [\text{likelihood}] \\
@@ -185,8 +190,7 @@ def _(mo):
     \beta &\sim \text{Uniform}(0, 1) & [\beta \text{ prior}] \\
     \sigma &\sim \text{Uniform}(0, 50) & [\sigma \text{ prior}]
     \end{align*}
-    """
-    )
+    """)
     return
 
 
@@ -235,8 +239,7 @@ def _(MEAN_W, data, np, plt, stats):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     \begin{align*}
     h_i &\sim \text{Normal}(\mu_i, \sigma) & [\text{likelihood}] \\
     \mu_i &= \alpha + \beta(x_i - \bar{x}) & [\text{linear model}] \\
@@ -246,19 +249,12 @@ def _(mo):
     \end{align*}
 
     The log-normal prior for beta ensures that the slopes are positive and within a reasonable range.
-    """
-    )
+    """)
     return
 
 
 @app.cell
-def _(data):
-    type(data.select("height")), type(data.get_column("height")), type(data["height"])
-    return
-
-
-@app.cell
-def _(MEAN_W, data, pm):
+def _(MEAN_W, az, data, pm):
     with pm.Model() as m4_3:
         _alpha = pm.Normal("alpha", mu=178, sigma=20)
         _beta = pm.Lognormal("beta", mu=0, sigma=1)
@@ -268,7 +264,9 @@ def _(MEAN_W, data, pm):
         # try type(data.select("height")), type(data.get_column("height")) = type(data["height"])
         _height = pm.Normal("height", mu=_mu, sigma=_sigma, observed=data.get_column("height"))
         idata_4_3 = pm.sample(1000, tune=1000)
-    return (idata_4_3,)
+
+    data_4_3 = az.extract(idata_4_3)
+    return data_4_3, idata_4_3
 
 
 @app.cell
@@ -299,8 +297,9 @@ def _(mo):
     mo.md("""
     So now let’s display a bunch of these lines, so you can see the scatter. This lesson will be
     easier to appreciate, if we use only some of the data to begin. Then you can see how adding
-    in more data changes the scatter of the lines. So we’ll begin with just the first 10 cases in d2.
-    The following code extracts the first 10 cases and re-estimates the model:""")
+    in more data changes the scatter of the lines. So we’ll begin with just the first 10 cases in data.
+    The following code extracts the first 10 cases and re-estimates the model:
+    """)
     return
 
 
@@ -327,7 +326,7 @@ def _(az, data, n_slider, plt, pm):
         _height = pm.Normal("height", mu=_mu, sigma=_sigma, observed=_data_n.get_column("height"))
         idata_N = pm.sample(1000, tune=1000)
 
-    _idata_df = az.extract_dataset(idata_N)
+    data_N = az.extract(idata_N)
 
     # we can plot the line using the mean of the posterior (this would just be one of all the possible lines)
     plt.plot(_data_n["weight"], _data_n["height"], ".")
@@ -335,7 +334,7 @@ def _(az, data, n_slider, plt, pm):
     for _i in range(20):
         plt.plot(
             _data_n["weight"],
-            _idata_df["alpha"].item(_i) + _idata_df["beta"].item(_i) * (_data_n["weight"] - mean_n),
+            data_N["alpha"].item(_i) + data_N["beta"].item(_i) * (_data_n["weight"] - mean_n),
             alpha=0.2,
             color="black",
         )
@@ -344,6 +343,42 @@ def _(az, data, n_slider, plt, pm):
     plt.xlabel("Weight")
     plt.ylabel("Height")
     plt.show()
+    return
+
+
+@app.cell
+def _(MEAN_W, az, data_4_3):
+    centre_at = 50
+    mu_at_centre = data_4_3["alpha"] + data_4_3["beta"] * (centre_at - MEAN_W)
+    az.plot_kde(mu_at_centre.values), az.hdi(mu_at_centre.values, hdi_prob=0.89)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    The value of $x_i$ in this case is `centre_at`. `mu_at_centre` is a vector of predicted means, one for each random sample from the posterior. Since joint `alpha` and `beta` went into computing each, the variation across those means incorporates the uncertainty in and correlation between both parameters. It might be helpful at this point to actually plot the density for this vector of means:
+    """)
+    return
+
+
+@app.cell
+def _(MEAN_W, data_4_3, np, plt):
+    _weight_seq = np.arange(25, 71)
+    _n_samples = data_4_3.sizes["sample"]
+    # only select every 10 sample from the posterior. Goes from 4000 to 400
+    # can delete 10 and run for all data if wanted
+    data_4_3_thinned = data_4_3.isel(sample=range(0, _n_samples, 10))
+    _n_samples_thinend = data_4_3_thinned.sizes["sample"]
+
+    _mu_pred = np.zeros((len(_weight_seq), _n_samples_thinend))
+    for _i, w in enumerate(_weight_seq):
+        # _mu_pred[_i] selects row _i from the _mu_pred array. So every row in this array is a distribution of heights for each weight in _weight_seq
+        _mu_pred[_i] = data_4_3_thinned["alpha"] + data_4_3_thinned["beta"] * (w - MEAN_W)
+
+    plt.plot(_weight_seq, _mu_pred, "C0.", alpha=0.1)
+    plt.xlabel("weight")
+    plt.ylabel("height")
     return
 
 
