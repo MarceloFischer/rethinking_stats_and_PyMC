@@ -14,18 +14,15 @@ def _(mo):
 
 @app.cell
 def _():
-    import numpy as np
-    import scipy.stats as stats
-
-    import polars as pl
-    import pandas as pd
-    import matplotlib.pyplot as plt
     import altair as alt
     import arviz as az
-
-    import pymc as pm
-
     import marimo as mo
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    import polars as pl
+    import pymc as pm
+    import scipy.stats as stats
 
     RANDOM_SEED = 42
     rng = np.random.default_rng(RANDOM_SEED)
@@ -107,6 +104,11 @@ def _(az, stats):
     _prior_h = stats.norm.rvs(loc=_mu, scale=_sigma, size=_n)
 
     az.plot_kde(_prior_h)
+    return
+
+
+@app.cell
+def _():
     return
 
 
@@ -253,6 +255,14 @@ def _(mo):
     return
 
 
+@app.cell(column=2, hide_code=True)
+def _(mo):
+    mo.md("""
+    ### Model 4_3 - Linear Prediction
+    """)
+    return
+
+
 @app.cell
 def _(MEAN_W, az, data, pm):
     with pm.Model() as m4_3:
@@ -266,13 +276,18 @@ def _(MEAN_W, az, data, pm):
         idata_4_3 = pm.sample(1000, tune=1000)
 
     data_4_3 = az.extract(idata_4_3)
-    return data_4_3, idata_4_3
+    return data_4_3, idata_4_3, m4_3
 
 
 @app.cell
 def _(az, idata_4_3):
-    _idata_df = az.extract(idata_4_3).to_dataframe()
-    az.summary(idata_4_3, kind="stats"), _idata_df, _idata_df.cov(), _idata_df.corr()
+    data_4_3_df = az.extract(idata_4_3).to_dataframe()
+    (
+        az.summary(idata_4_3, kind="stats"),
+        data_4_3_df,
+        data_4_3_df.cov().round(3),
+        data_4_3_df.corr().round(3),
+    )
     return
 
 
@@ -331,26 +346,19 @@ def _(az, data, n_slider, plt, pm):
     # we can plot the line using the mean of the posterior (this would just be one of all the possible lines)
     plt.plot(_data_n["weight"], _data_n["height"], ".")
 
-    for _i in range(20):
+    _n_lines = 20
+    for _i in range(_n_lines):
         plt.plot(
             _data_n["weight"],
             data_N["alpha"].item(_i) + data_N["beta"].item(_i) * (_data_n["weight"] - mean_n),
             alpha=0.2,
-            color="black",
+            color="orange",
         )
 
-    plt.title(f"20 lines for {_n} Data Points")
+    plt.title(f"{_n_lines} lines for {_n} Data Points")
     plt.xlabel("Weight")
     plt.ylabel("Height")
     plt.show()
-    return
-
-
-@app.cell
-def _(MEAN_W, az, data_4_3):
-    centre_at = 50
-    mu_at_centre = data_4_3["alpha"] + data_4_3["beta"] * (centre_at - MEAN_W)
-    az.plot_kde(mu_at_centre.values), az.hdi(mu_at_centre.values, hdi_prob=0.89)
     return
 
 
@@ -363,22 +371,123 @@ def _(mo):
 
 
 @app.cell
+def _(MEAN_W, az, data_4_3):
+    centre_at = 50
+    mu_at_centre = data_4_3["alpha"] + data_4_3["beta"] * (centre_at - MEAN_W)
+    az.plot_kde(mu_at_centre.values), az.hdi(mu_at_centre.values, hdi_prob=0.89)
+    return
+
+
+@app.cell
 def _(MEAN_W, data_4_3, np, plt):
-    _weight_seq = np.arange(25, 71)
+    weight_seq_4_3 = np.arange(25, 71)
+    # weight_seq_4_3 = data['weight'].sort()
     _n_samples = data_4_3.sizes["sample"]
+
     # only select every 10 sample from the posterior. Goes from 4000 to 400
     # can delete 10 and run for all data if wanted
-    data_4_3_thinned = data_4_3.isel(sample=range(0, _n_samples, 10))
+    # data_4_3_thinned = data_4_3.isel(sample=range(0, _n_samples, 10))
+    data_4_3_thinned = data_4_3.isel(sample=range(0, _n_samples))
     _n_samples_thinend = data_4_3_thinned.sizes["sample"]
 
-    _mu_pred = np.zeros((len(_weight_seq), _n_samples_thinend))
-    for _i, w in enumerate(_weight_seq):
-        # _mu_pred[_i] selects row _i from the _mu_pred array. So every row in this array is a distribution of heights for each weight in _weight_seq
-        _mu_pred[_i] = data_4_3_thinned["alpha"] + data_4_3_thinned["beta"] * (w - MEAN_W)
+    mu_pred_4_3 = np.zeros((len(weight_seq_4_3), _n_samples_thinend))
+    for _i, w in enumerate(weight_seq_4_3):
+        # mu_pred_4_3[_i] selects row _i from the mu_pred_4_3 array. So every row in this array is a distribution of heights for each weight in weight_seq_4_3
+        mu_pred_4_3[_i] = data_4_3_thinned["alpha"] + data_4_3_thinned["beta"] * (w - MEAN_W)
 
-    plt.plot(_weight_seq, _mu_pred, "C0.", alpha=0.1)
+    # to calculate the mean height for each weight, we can just use mu_pred_4_3.mean(axis=1). This would average each row of the mu_pred_4_3 array.
+
+    # For every value in weight_seq_4_3, plots the corresponding row from mu_pred_4_3. In other words, for every weight, plot the correponding distribution of mu's.
+    plt.plot(weight_seq_4_3, mu_pred_4_3, "C0.", alpha=0.1)
     plt.xlabel("weight")
     plt.ylabel("height")
+    return mu_pred_4_3, weight_seq_4_3
+
+
+@app.cell
+def _(az, data, mu_pred_4_3, plt, weight_seq_4_3):
+    # this calculates the highest density interval for each distribution of height for each weight.
+    # mu_hdi_4_3 = az.hdi(mu_pred_4_3.T)
+
+    az.plot_hdi(weight_seq_4_3, mu_pred_4_3.T)
+    plt.scatter(data["weight"], data["height"])
+    plt.plot(weight_seq_4_3, mu_pred_4_3.mean(axis=1), color="green", lw=3)
+    plt.xlabel("weight")
+    plt.ylabel("height")
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The above only shows the uncertainty for the mean of the posterior. We want to know how the whole posterior distribution behaves. It is given by
+
+    \begin{align*}
+    \mu_i &= \alpha + \beta w_i \quad  (\beta(x_i - \bar{x})) & [\text{linear model}]
+    \end{align*}
+
+    For every unique weight value, we sample from a Gaussian with the correct mean $\mu$ for that weight, using the correct value from $\sigma$ sampled from the same posterior. If we do this for every sample from the posterior, for every weight value of interest, we end up with a collection of simulated heights that embodies the uncertainty in the posterior as well as the uncertainty in the Gaussian distribution of heights.
+    """)
+    return
+
+
+@app.cell
+def _(az, data, idata_4_3, m4_3, mu_pred_4_3, plt, pm, weight_seq_4_3):
+    with m4_3:
+        # Generate predicted heights based on the posterior distribution
+        height_pred_4_3 = pm.sample_posterior_predictive(idata_4_3)
+
+    # calculate the hdi interval for each weight sample
+    height_pred_4_3_hdi = az.hdi(height_pred_4_3["posterior_predictive"], hdi_prob=0.89)
+
+    # plots the hdi for the mean and the line for the mean
+    az.plot_hdi(weight_seq_4_3, mu_pred_4_3.T, hdi_prob=0.89, color="green")
+    plt.plot(weight_seq_4_3, mu_pred_4_3.mean(axis=1), lw=3, color="green")
+    # plots the hdi for the whole posterior distribution
+    az.plot_hdi(data["weight"], height_pred_4_3["posterior_predictive"]["height"], hdi_prob=0.89)
+    # plots the whole data
+    plt.scatter(data["weight"], data["height"])
+
+    plt.xlim(data["weight"].min(), data["weight"].max())
+
+    plt.gca()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    The above can be done manually:
+    """)
+    return
+
+
+@app.cell
+def _(MEAN_W, az, data, data_4_3, mu_pred_4_3, np, plt, stats, weight_seq_4_3):
+    post_samples_4_3 = []
+
+    for _ in range(1000):  # number of samples from the posterior
+        _i = np.random.randint(0, len(weight_seq_4_3))
+        _mu_pred = data_4_3["alpha"][_i].item(0) + data_4_3["beta"][_i].item(0) * (weight_seq_4_3 - MEAN_W)
+        _sigma_pred = data_4_3["sigma"][_i]
+        post_samples_4_3.append(stats.norm.rvs(loc=_mu_pred, scale=_sigma_pred))
+
+    # plots the hdi for the mean and the line for the mean
+    az.plot_hdi(weight_seq_4_3, mu_pred_4_3.T, hdi_prob=0.89, color="green")
+    plt.plot(weight_seq_4_3, mu_pred_4_3.mean(axis=1), lw=3, color="green")
+    # plots the hdi for the whole posterior distribution
+    az.plot_hdi(weight_seq_4_3, np.array(post_samples_4_3), hdi_prob=0.89)
+    # plots the whole data
+    plt.scatter(data["weight"], data["height"])
+
+    plt.xlim(data["weight"].min(), data["weight"].max())
+
+    plt.gca()
+    return
+
+
+@app.cell
+def _():
     return
 
 
