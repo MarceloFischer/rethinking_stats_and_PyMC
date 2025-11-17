@@ -1,0 +1,290 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.17.8"
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "000d204a364b8516950c635bad268ace",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"imports-and-constants\">Imports and Constants</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "c2a31b15f76cfe57efcf5d2f90994d43",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"data-cleaning\">Data Cleaning</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "5c5145ff9b3bae6036887524842d77aa",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"our-model\">Our Model</h2>\n<marimo-tex class=\"arithmatex\">||[\nh_i \\sim \\text{Normal}(\\mu, \\sigma)\n||]</marimo-tex><marimo-tex class=\"arithmatex\">||[\n\\mu \\sim \\text{Normal}(178, 20)\n||]</marimo-tex><marimo-tex class=\"arithmatex\">||[\n\\sigma \\sim \\text{Uniform}(0, 50)\n||]</marimo-tex></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "8f8257b25c6f2dfd7e57fb8cc57a3a63",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"quadratic-approximation\">Quadratic Approximation</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "iLit",
+      "code_hash": "0d31e5f06691f4367bac2957dbb05a0e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"linear-prediction\">Linear Prediction</h2></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ROlb",
+      "code_hash": "b75831863702c6a0d3a61c6348de9673",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><marimo-tex class=\"arithmatex\">||[\\begin{align*}\nh_i &amp;\\sim \\text{Normal}(\\mu_i, \\sigma) &amp; [\\text{likelihood}] \\\\\n\\mu_i &amp;= \\alpha + \\beta w_i \\quad  (\\beta(x_i - \\bar{x})) &amp; [\\text{linear model}] \\\\\n\\alpha &amp;\\sim \\text{Normal}(178, 20) &amp; [\\alpha \\text{ prior}] \\\\\n\\beta &amp;\\sim \\text{Normal}(0, 10) &amp; [\\beta \\text{ prior}] \\\\\n\\sigma &amp;\\sim \\text{Uniform}(0, 50) &amp; [\\sigma \\text{ prior}]\n\\end{align*}||]</marimo-tex><span class=\"paragraph\">The golem is assuming (by using a Gaussian) that the relationship to construct the mean is additive. We do grown a bit every year/day/minute and the weight, on avg, increases a bit as well.</span>\n<span class=\"paragraph\">As the image below show, this does not make a good model as it allows or negative slopes and also slopes that are clearly not resoanble.</span>\n<span class=\"paragraph\">Let's restrict beta to only positive values as:</span>\n<marimo-tex class=\"arithmatex\">||[\\begin{align*}\nh_i &amp;\\sim \\text{Normal}(\\mu_i, \\sigma) &amp; [\\text{likelihood}] \\\\\n\\mu_i &amp;= \\alpha + \\beta w_i &amp; [\\text{linear model}] \\\\\n\\alpha &amp;\\sim \\text{Normal}(178, 20) &amp; [\\alpha \\text{ prior}] \\\\\n\\beta &amp;\\sim \\text{Log-Normal}(0, 10) &amp; [\\beta \\text{ prior}] \\\\\n\\sigma &amp;\\sim \\text{Uniform}(0, 50) &amp; [\\sigma \\text{ prior}]\n\\end{align*}||]</marimo-tex><span class=\"paragraph\">Another way to is to expect that the slope would be between 0 and 1. Weight is in kg and height is in cm. Usually, weight is less than height.</span>\n<marimo-tex class=\"arithmatex\">||[\\begin{align*}\nh_i &amp;\\sim \\text{Normal}(\\mu_i, \\sigma) &amp; [\\text{likelihood}] \\\\\n\\mu_i &amp;= \\alpha + \\beta w_i &amp; [\\text{linear model}] \\\\\n\\alpha &amp;\\sim \\text{Normal}(178, 20) &amp; [\\alpha \\text{ prior}] \\\\\n\\beta &amp;\\sim \\text{Uniform}(0, 1) &amp; [\\beta \\text{ prior}] \\\\\n\\sigma &amp;\\sim \\text{Uniform}(0, 50) &amp; [\\sigma \\text{ prior}]\n\\end{align*}||]</marimo-tex></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "TqIu",
+      "code_hash": "6a9859561eea86efe0f1cb273c5b0d9b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><marimo-tex class=\"arithmatex\">||[\\begin{align*}\nh_i &amp;\\sim \\text{Normal}(\\mu_i, \\sigma) &amp; [\\text{likelihood}] \\\\\n\\mu_i &amp;= \\alpha + \\beta(x_i - \\bar{x}) &amp; [\\text{linear model}] \\\\\n\\alpha &amp;\\sim \\text{Normal}(178, 20) &amp; [\\alpha \\text{ prior}] \\\\\n\\beta &amp;\\sim \\text{Log-Normal}(0, 1) &amp; [\\beta \\text{ prior}] \\\\\n\\sigma &amp;\\sim \\text{Uniform}(0, 50) &amp; [\\sigma \\text{ prior}]\n\\end{align*}||]</marimo-tex><span class=\"paragraph\">The log-normal prior for beta ensures that the slopes are positive and within a reasonable range.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Vxnm",
+      "code_hash": "bcc396379870b30cba4084f65bab1444",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"model-4_3-linear-prediction\">Model 4_3 - Linear Prediction</h3></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Pvdt",
+      "code_hash": "a1fd170e6048d035f775365a462045e7",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">So now let\u2019s display a bunch of these lines, so you can see the scatter. This lesson will be\neasier to appreciate, if we use only some of the data to begin. Then you can see how adding\nin more data changes the scatter of the lines. So we\u2019ll begin with just the first 10 cases in data.\nThe following code extracts the first 10 cases and re-estimates the model:</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "nHfw",
+      "code_hash": "4f7e50f59495288fda83e851709a32b9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">The value of <marimo-tex class=\"arithmatex\">||(x_i||)</marimo-tex> in this case is <code>centre_at</code>. <code>mu_at_centre</code> is a vector of predicted means, one for each random sample from the posterior. Since joint <code>alpha</code> and <code>beta</code> went into computing each, the variation across those means incorporates the uncertainty in and correlation between both parameters. It might be helpful at this point to actually plot the density for this vector of means:</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "NCOB",
+      "code_hash": "d816292ab1b4b6bd15c8c1d255b3b940",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">The above only shows the uncertainty for the mean of the posterior. We want to know how the whole posterior distribution behaves. It is given by</span>\n<marimo-tex class=\"arithmatex\">||[\\begin{align*}\n\\mu_i &amp;= \\alpha + \\beta w_i \\quad  (\\beta(x_i - \\bar{x})) &amp; [\\text{linear model}]\n\\end{align*}||]</marimo-tex><span class=\"paragraph\">For every unique weight value, we sample from a Gaussian with the correct mean <marimo-tex class=\"arithmatex\">||(\\mu||)</marimo-tex> for that weight, using the correct value from <marimo-tex class=\"arithmatex\">||(\\sigma||)</marimo-tex> sampled from the same posterior. If we do this for every sample from the posterior, for every weight value of interest, we end up with a collection of simulated heights that embodies the uncertainty in the posterior as well as the uncertainty in the Gaussian distribution of heights.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "TRpd",
+      "code_hash": "1193d6f956bd2652a8e588a51f5f1e7c",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">The above can be done manually:</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "b3fdd21bf59e76d67416c59272aa8aff",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "4da3e8e2974aa5659c8412c7c8e63f0e",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "200d6a445e0d8c5f99f48f25f3858aab",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "PKri",
+      "code_hash": "0dc2c1e71d5a3c7eebacf5d6f076dc3a",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "11c9924cdbc5b9b8c1ffaa727ae116dd",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "d37db77bfa0fe3a6eb3650ed7958c725",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "emfo",
+      "code_hash": "419bc5f796b7d31916f9a462930d94ea",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "cfe3a83195a14249230b46085990c605",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "nWHF",
+      "code_hash": "10677ba384149fbc7c0cc329f45c1940",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "ZHCJ",
+      "code_hash": "b4451b75bf41d95611cdf7ab264fb08d",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "qnkX",
+      "code_hash": "b0615b70da4fdd18cc9fc9c4e3445e36",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "DnEU",
+      "code_hash": "485762cd727d2f5179bd493dacc939f9",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "ulZA",
+      "code_hash": "3c51b6516f06500ff2bf92c0a0b34ad8",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "ecfG",
+      "code_hash": "2fe707656974d5c1b71ee6d65cdb76f2",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "ZBYS",
+      "code_hash": "2481a6139b1c4ab7cf6c6f24851d286d",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "aLJB",
+      "code_hash": "b0cb0eb79468955ce60b3aed65d21209",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "xXTn",
+      "code_hash": "03a7431461ce065de830110e2c69cc31",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "AjVT",
+      "code_hash": "3d6407a010d077d2fc29d5ec9ddb3f16",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "pHFh",
+      "code_hash": "6b0666018e95542087f6313be862ed2e",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "aqbW",
+      "code_hash": "97e30822a6005987f4ba61398669f2cb",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "TXez",
+      "code_hash": "6249a8531b21b8e27040c82c0d92fbe6",
+      "outputs": [],
+      "console": []
+    }
+  ]
+}
