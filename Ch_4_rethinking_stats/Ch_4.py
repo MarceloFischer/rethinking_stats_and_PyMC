@@ -1,7 +1,12 @@
 import marimo
 
-__generated_with = "0.17.8"
+__generated_with = "0.18.0"
 app = marimo.App(width="columns")
+
+
+@app.cell
+def _():
+    return
 
 
 @app.cell(column=0, hide_code=True)
@@ -19,7 +24,6 @@ def _():
     import marimo as mo
     import matplotlib.pyplot as plt
     import numpy as np
-    import pandas as pd
     import polars as pl
     import pymc as pm
     import scipy.stats as stats
@@ -28,6 +32,7 @@ def _():
     rng = np.random.default_rng(RANDOM_SEED)
     az.style.use("arviz-darkgrid")
     az.rcParams["stats.ci_prob"] = 0.89  # sets default credible interval used by arviz
+
     return az, mo, np, pl, plt, pm, stats
 
 
@@ -41,12 +46,21 @@ def _(mo):
 
 @app.cell
 def _(pl):
-    raw_data = pl.read_csv("/home/marcelo/git/rethinking_stats_and_PyMC/data/Howell1.csv", separator=";")
-
+    raw_data = pl.read_csv(
+        "/home/marcelo/git/rethinking_stats_and_PyMC/data/Howell1.csv", separator=";"
+    )
 
     def filter_data(df: pl.DataFrame):
         return df.filter(pl.col("age") >= 18)
+
     return filter_data, raw_data
+
+
+@app.cell
+def _(raw_data):
+    raw_data
+
+    return
 
 
 @app.cell
@@ -54,12 +68,14 @@ def _(filter_data, raw_data):
     data = raw_data.pipe(filter_data)
 
     data
+
     return (data,)
 
 
 @app.cell
 def _(data):
     MEAN_W = data.select("weight").mean().item()
+
     return (MEAN_W,)
 
 
@@ -70,6 +86,7 @@ def _(np, plt, stats):
 
     _x = np.linspace(-10, 60, 100)
     plt.plot(_x, stats.uniform.pdf(_x, 0, 50))
+
     return
 
 
@@ -78,17 +95,11 @@ def _(mo):
     mo.md(r"""
     ## Our Model
 
-    \[
-    h_i \sim \text{Normal}(\mu, \sigma)
-    \]
+    $h_i \sim \text{Normal}(\mu, \sigma)$
 
-    \[
-    \mu \sim \text{Normal}(178, 20)
-    \]
+    $\mu \sim \text{Normal}(178, 20)$
 
-    \[
-    \sigma \sim \text{Uniform}(0, 50)
-    \]
+    $\sigma \sim \text{Uniform}(0, 50)$
     """)
     return
 
@@ -104,11 +115,7 @@ def _(az, stats):
     _prior_h = stats.norm.rvs(loc=_mu, scale=_sigma, size=_n)
 
     az.plot_kde(_prior_h)
-    return
 
-
-@app.cell
-def _():
     return
 
 
@@ -124,16 +131,24 @@ def _(mo):
 def _(data, pm):
     with pm.Model() as m4_1:
         # initival can be given to tell the algo where to start looking for the peak
-        _mu = pm.Normal("mu", mu=178, sigma=20, initval=data.select("height").mean().item())
-        _sigma = pm.Uniform("sigma", lower=0, upper=50, initval=data.select("height").std().item())
-        _height = pm.Normal("height", mu=_mu, sigma=_sigma, observed=data.select("height"))
+        _mu = pm.Normal(
+            "mu", mu=178, sigma=20, initval=data.select("height").mean().item()
+        )
+        _sigma = pm.Uniform(
+            "sigma", lower=0, upper=50, initval=data.select("height").std().item()
+        )
+        _height = pm.Normal(
+            "height", mu=_mu, sigma=_sigma, observed=data.select("height")
+        )
         idata_4_1 = pm.sample(1_000, tune=1_000)
+
     return (idata_4_1,)
 
 
 @app.cell
 def _(az, idata_4_1):
     az.plot_trace(idata_4_1), az.summary(idata_4_1, round_to=2, kind="stats")
+
     return
 
 
@@ -141,6 +156,7 @@ def _(az, idata_4_1):
 def _(az, idata_4_1):
     _idata_df = az.extract(idata_4_1).to_dataframe()
     _idata_df, _idata_df.cov(), _idata_df.corr()
+
     return
 
 
@@ -155,6 +171,7 @@ def _(mo):
 @app.cell
 def _(data, plt):
     plt.plot(data.select("height"), data.select("weight"), ".")
+
     return
 
 
@@ -203,12 +220,16 @@ def _(MEAN_W, data, np, plt, stats):
     _N = 100  # 100 lines
     _alpha = stats.norm.rvs(loc=178, scale=20, size=_N)
     _, _ax = plt.subplots(1, 3, sharey=True, figsize=(10, 5))
-    _x = np.linspace(data.select("weight").min().item(), data.select("weight").max().item(), _N)
+    _x = np.linspace(
+        data.select("weight").min().item(), data.select("weight").max().item(), _N
+    )
 
     _beta = stats.norm.rvs(loc=0, scale=10, size=_N)
     for _i in range(_N):
         _ax[0].plot(_x, _alpha[_i] + _beta[_i] * (_x - MEAN_W), "k", alpha=0.2)
-        _ax[0].set_xlim(data.select("weight").min().item(), data.select("weight").max().item())
+        _ax[0].set_xlim(
+            data.select("weight").min().item(), data.select("weight").max().item()
+        )
         _ax[0].set_ylim(-100, 400)
         _ax[0].axhline(0, c="k", ls="--")
         _ax[0].axhline(272, c="k")
@@ -218,7 +239,9 @@ def _(MEAN_W, data, np, plt, stats):
     _beta = stats.lognorm.rvs(s=1, scale=1, size=_N)
     for _i in range(_N):
         _ax[1].plot(_x, _alpha[_i] + _beta[_i] * (_x - MEAN_W), "k", alpha=0.2)
-        _ax[1].set_xlim(data.select("weight").min().item(), data.select("weight").max().item())
+        _ax[1].set_xlim(
+            data.select("weight").min().item(), data.select("weight").max().item()
+        )
         _ax[1].set_ylim(-100, 400)
         _ax[1].axhline(0, c="k", ls="--", label="embryo")
         _ax[1].axhline(272, c="k")
@@ -229,13 +252,16 @@ def _(MEAN_W, data, np, plt, stats):
     _beta = stats.uniform.rvs(loc=0, scale=1, size=_N)
     for _i in range(_N):
         _ax[2].plot(_x, _alpha[_i] + _beta[_i] * (_x - MEAN_W), "k", alpha=0.2)
-        _ax[2].set_xlim(data.select("weight").min().item(), data.select("weight").max().item())
+        _ax[2].set_xlim(
+            data.select("weight").min().item(), data.select("weight").max().item()
+        )
         _ax[2].set_ylim(-100, 400)
         _ax[2].axhline(0, c="k", ls="--", label="embryo")
         _ax[2].axhline(272, c="k")
         _ax[2].set_xlabel("weight")
 
     plt.gca()
+
     return
 
 
@@ -272,22 +298,27 @@ def _(MEAN_W, az, data, pm):
         _mu = _alpha + _beta * (data.get_column("weight").to_numpy() - MEAN_W)
         # CANNOT USE data.select('height') AS IT RETURNS A DATAFRAME. NEEDS TO BE A SERIES. RESULTS ARE COMPLETELY DIFFERENT
         # try type(data.select("height")), type(data.get_column("height")) = type(data["height"])
-        _height = pm.Normal("height", mu=_mu, sigma=_sigma, observed=data.get_column("height"))
+        _height = pm.Normal(
+            "height", mu=_mu, sigma=_sigma, observed=data.get_column("height")
+        )
         idata_4_3 = pm.sample(1000, tune=1000)
 
     data_4_3 = az.extract(idata_4_3)
+
     return data_4_3, idata_4_3, m4_3
 
 
 @app.cell
 def _(az, idata_4_3):
     data_4_3_df = az.extract(idata_4_3).to_dataframe()
+
     (
         az.summary(idata_4_3, kind="stats"),
         data_4_3_df,
         data_4_3_df.cov().round(3),
         data_4_3_df.corr().round(3),
     )
+
     return
 
 
@@ -298,12 +329,14 @@ def _(MEAN_W, data, idata_4_3, plt):
 
     plt.plot(
         data["weight"],
-        idata_4_3.posterior["alpha"].mean().item() + idata_4_3.posterior["beta"].mean().item() * (data["weight"] - MEAN_W),
+        idata_4_3.posterior["alpha"].mean().item()
+        + idata_4_3.posterior["beta"].mean().item() * (data["weight"] - MEAN_W),
     )
 
     plt.xlabel("Weight")
     plt.ylabel("Height")
-    plt.show()
+    plt.gca()
+
     return
 
 
@@ -322,6 +355,7 @@ def _(mo):
 def _(data, mo):
     n_slider = mo.ui.slider(10, data.shape[0], 10, show_value=True)
     n_slider
+
     return (n_slider,)
 
 
@@ -338,7 +372,9 @@ def _(az, data, n_slider, plt, pm):
         _mu = _alpha + _beta * (_data_n.get_column("weight").to_numpy() - mean_n)
         # CANNOT USE data.select('height') AS IT RETURNS A DATAFRAME. NEEDS TO BE A SERIES. RESULTS ARE COMPLETELY DIFFERENT
         # try type(data.select("height")), type(data.get_column("height")) = type(data["height"])
-        _height = pm.Normal("height", mu=_mu, sigma=_sigma, observed=_data_n.get_column("height"))
+        _height = pm.Normal(
+            "height", mu=_mu, sigma=_sigma, observed=_data_n.get_column("height")
+        )
         idata_N = pm.sample(1000, tune=1000)
 
     data_N = az.extract(idata_N)
@@ -350,7 +386,8 @@ def _(az, data, n_slider, plt, pm):
     for _i in range(_n_lines):
         plt.plot(
             _data_n["weight"],
-            data_N["alpha"].item(_i) + data_N["beta"].item(_i) * (_data_n["weight"] - mean_n),
+            data_N["alpha"].item(_i)
+            + data_N["beta"].item(_i) * (_data_n["weight"] - mean_n),
             alpha=0.2,
             color="orange",
         )
@@ -358,7 +395,8 @@ def _(az, data, n_slider, plt, pm):
     plt.title(f"{_n_lines} lines for {_n} Data Points")
     plt.xlabel("Weight")
     plt.ylabel("Height")
-    plt.show()
+    plt.gca()
+
     return
 
 
@@ -375,6 +413,7 @@ def _(MEAN_W, az, data_4_3):
     centre_at = 50
     mu_at_centre = data_4_3["alpha"] + data_4_3["beta"] * (centre_at - MEAN_W)
     az.plot_kde(mu_at_centre.values), az.hdi(mu_at_centre.values, hdi_prob=0.89)
+
     return
 
 
@@ -393,7 +432,9 @@ def _(MEAN_W, data_4_3, np, plt):
     mu_pred_4_3 = np.zeros((len(weight_seq_4_3), _n_samples_thinend))
     for _i, w in enumerate(weight_seq_4_3):
         # mu_pred_4_3[_i] selects row _i from the mu_pred_4_3 array. So every row in this array is a distribution of heights for each weight in weight_seq_4_3
-        mu_pred_4_3[_i] = data_4_3_thinned["alpha"] + data_4_3_thinned["beta"] * (w - MEAN_W)
+        mu_pred_4_3[_i] = data_4_3_thinned["alpha"] + data_4_3_thinned["beta"] * (
+            w - MEAN_W
+        )
 
     # to calculate the mean height for each weight, we can just use mu_pred_4_3.mean(axis=1). This would average each row of the mu_pred_4_3 array.
 
@@ -401,6 +442,8 @@ def _(MEAN_W, data_4_3, np, plt):
     plt.plot(weight_seq_4_3, mu_pred_4_3, "C0.", alpha=0.1)
     plt.xlabel("weight")
     plt.ylabel("height")
+    plt.gca()
+
     return mu_pred_4_3, weight_seq_4_3
 
 
@@ -414,6 +457,8 @@ def _(az, data, mu_pred_4_3, plt, weight_seq_4_3):
     plt.plot(weight_seq_4_3, mu_pred_4_3.mean(axis=1), color="green", lw=3)
     plt.xlabel("weight")
     plt.ylabel("height")
+    plt.gca()
+
     return
 
 
@@ -444,13 +489,16 @@ def _(az, data, idata_4_3, m4_3, mu_pred_4_3, plt, pm, weight_seq_4_3):
     az.plot_hdi(weight_seq_4_3, mu_pred_4_3.T, hdi_prob=0.89, color="green")
     plt.plot(weight_seq_4_3, mu_pred_4_3.mean(axis=1), lw=3, color="green")
     # plots the hdi for the whole posterior distribution
-    az.plot_hdi(data["weight"], height_pred_4_3["posterior_predictive"]["height"], hdi_prob=0.89)
+    az.plot_hdi(
+        data["weight"], height_pred_4_3["posterior_predictive"]["height"], hdi_prob=0.89
+    )
     # plots the whole data
     plt.scatter(data["weight"], data["height"])
 
     plt.xlim(data["weight"].min(), data["weight"].max())
 
     plt.gca()
+
     return
 
 
@@ -468,7 +516,9 @@ def _(MEAN_W, az, data, data_4_3, mu_pred_4_3, np, plt, stats, weight_seq_4_3):
 
     for _ in range(1000):  # number of samples from the posterior
         _i = np.random.randint(0, len(weight_seq_4_3))
-        _mu_pred = data_4_3["alpha"][_i].item(0) + data_4_3["beta"][_i].item(0) * (weight_seq_4_3 - MEAN_W)
+        _mu_pred = data_4_3["alpha"][_i].item(0) + data_4_3["beta"][_i].item(0) * (
+            weight_seq_4_3 - MEAN_W
+        )
         _sigma_pred = data_4_3["sigma"][_i]
         post_samples_4_3.append(stats.norm.rvs(loc=_mu_pred, scale=_sigma_pred))
 
@@ -483,6 +533,7 @@ def _(MEAN_W, az, data, data_4_3, mu_pred_4_3, np, plt, stats, weight_seq_4_3):
     plt.xlim(data["weight"].min(), data["weight"].max())
 
     plt.gca()
+
     return
 
 
