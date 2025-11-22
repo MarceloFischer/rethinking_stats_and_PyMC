@@ -1,12 +1,14 @@
 import marimo
 
-__generated_with = "0.16.5"
+__generated_with = "0.17.8"
 app = marimo.App(width="columns")
 
 
 @app.cell(column=0, hide_code=True)
 def _(mo):
-    mo.md(r"""### Imports""")
+    mo.md(r"""
+    ### Imports
+    """)
     return
 
 
@@ -32,14 +34,15 @@ def _(np):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""## Model Fitting""")
+    mo.md(r"""
+    ## Model Fitting
+    """)
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     ### Here's the goal:
 
     Toss a globe and check if the index finger landed on land or water. Our goal is to estimate the proportion of water in the world given the data we collect. Observed data is W L W W W L W L W
@@ -56,8 +59,7 @@ def _(mo):
     - The probability of W in every toss is the same
         - It follows a binomial distribution
     $$P(W, L \mid p) = \frac{(W + L)!}{W! \, L!} \; p^W (1 - p)^L$$
-    """
-    )
+    """)
     return
 
 
@@ -70,38 +72,32 @@ def _(binom):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     The above means that
     $$W \sim \mathrm{Binomial}(N,\, p), \text{where } N=W+L$$
-    and 
+    and
     $$p \sim \mathrm{Uniform}(0, 1)$$
-    """
-    )
+    """)
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     $$Posterior = \frac{Probability\_of\_the\_data \times Prior}{Marginal\_probability}$$
 
     $$Pr(p\mid W,L) = \frac{Pr(W,L \mid p) \times Pr(p)}{Pr(W,L)}$$
-    """
-    )
+    """)
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     ### Grid Approximation
 
     Awful for scalability, but a good starting point to get the theory behind the models
-    """
-    )
+    """)
     return
 
 
@@ -157,13 +153,11 @@ def _(post_df):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     ### Quadratic Approximation
 
     This approximation essentially represents any log-posterior with a parabola. This is because under quite general conditions, the region near the peak of the posterior distribution will be nearly Gaussian in shape.
-    """
-    )
+    """)
     return
 
 
@@ -174,13 +168,17 @@ def _():
 
 @app.cell(column=1, hide_code=True)
 def _(mo):
-    mo.md(r"""## Chapter 2""")
+    mo.md(r"""
+    ## Chapter 2
+    """)
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""### Exercise 1 - Medium""")
+    mo.md(r"""
+    ### Exercise 1 - Medium
+    """)
     return
 
 
@@ -212,7 +210,9 @@ def _(grid_approx_ch2, mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""### Exercise 2 - Medium""")
+    mo.md(r"""
+    ### Exercise 2 - Medium
+    """)
     return
 
 
@@ -245,7 +245,9 @@ def _(grid_approx_ch2, mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""### Exercise 3 - Medium""")
+    mo.md(r"""
+    ### Exercise 3 - Medium
+    """)
     return
 
 
@@ -264,7 +266,9 @@ def _():
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""### Exercise 4 - Medium""")
+    mo.md(r"""
+    ### Exercise 4 - Medium
+    """)
     return
 
 
@@ -281,7 +285,9 @@ def _(np):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""### Exercise 5 - Medium""")
+    mo.md(r"""
+    ### Exercise 5 - Medium
+    """)
     return
 
 
@@ -298,7 +304,9 @@ def _(np):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""### Exercise 6 - Medium""")
+    mo.md(r"""
+    ### Exercise 6 - Medium
+    """)
     return
 
 
@@ -319,7 +327,9 @@ def _(np, pl):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""### Exercise 7 - Medium""")
+    mo.md(r"""
+    ### Exercise 7 - Medium
+    """)
     return
 
 
@@ -336,13 +346,17 @@ def _(np):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""## Chapter 3""")
+    mo.md(r"""
+    ## Chapter 3
+    """)
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""### Exercise - Easy""")
+    mo.md(r"""
+    ### Exercise - Easy
+    """)
     return
 
 
@@ -419,7 +433,9 @@ def _(np, samples_easy):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""### Exercise - Medium""")
+    mo.md(r"""
+    ### Exercise - Medium
+    """)
     return
 
 
@@ -487,7 +503,9 @@ def _():
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""### Exercise - Hard""")
+    mo.md(r"""
+    ### Exercise - Hard
+    """)
     return
 
 
@@ -754,7 +772,6 @@ def _(az, binom, birth1, birth2, grid_approx_ch2, np):
     # plt.show()
 
     # 3H5. The model assumes that sex of first and second births are independent. To check this assumption, focus now on second births that followed female first borns. Compare 10,000 simulated counts of boys to only those second births that followed girls. To do this correctly, you need to count the number of first borns who were girls and simulate that many births, 10,000 times. Compare the counts of boys in your simulations to the actual observed count of boys following girls. How does the model look in this light? Any guesses what is going on in these data?
-
 
     return
 
