@@ -275,7 +275,7 @@ def _(mo):
 @app.cell
 def _(mo):
     mo.md(r"""
- 
+    ![alt text](image.png)
     """)
     return
 
