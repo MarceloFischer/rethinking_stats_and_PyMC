@@ -1,15 +1,15 @@
 import marimo
 
-__generated_with = "0.18.0"
+__generated_with = "0.17.8"
 app = marimo.App(width="columns")
 
 
-@app.cell
+@app.cell(column=0)
 def _():
     return
 
 
-@app.cell(column=0, hide_code=True)
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Imports and Constants
@@ -32,7 +32,6 @@ def _():
     rng = np.random.default_rng(RANDOM_SEED)
     az.style.use("arviz-darkgrid")
     az.rcParams["stats.ci_prob"] = 0.89  # sets default credible interval used by arviz
-
     return az, mo, np, pl, plt, pm, stats
 
 
@@ -53,30 +52,12 @@ def _(pl):
     def filter_data(df: pl.DataFrame):
         return df.filter(pl.col("age") >= 18)
 
-    return filter_data, raw_data
-
-
-@app.cell
-def _(raw_data):
-    raw_data
-
-    return
-
-
-@app.cell
-def _(filter_data, raw_data):
     data = raw_data.pipe(filter_data)
 
-    data
-
-    return (data,)
-
-
-@app.cell
-def _(data):
     MEAN_W = data.select("weight").mean().item()
 
-    return (MEAN_W,)
+    data
+    return MEAN_W, data
 
 
 @app.cell
@@ -86,7 +67,6 @@ def _(np, plt, stats):
 
     _x = np.linspace(-10, 60, 100)
     plt.plot(_x, stats.uniform.pdf(_x, 0, 50))
-
     return
 
 
@@ -115,7 +95,6 @@ def _(az, stats):
     _prior_h = stats.norm.rvs(loc=_mu, scale=_sigma, size=_n)
 
     az.plot_kde(_prior_h)
-
     return
 
 
@@ -141,14 +120,12 @@ def _(data, pm):
             "height", mu=_mu, sigma=_sigma, observed=data.select("height")
         )
         idata_4_1 = pm.sample(1_000, tune=1_000)
-
     return (idata_4_1,)
 
 
 @app.cell
 def _(az, idata_4_1):
     az.plot_trace(idata_4_1), az.summary(idata_4_1, round_to=2, kind="stats")
-
     return
 
 
@@ -156,7 +133,6 @@ def _(az, idata_4_1):
 def _(az, idata_4_1):
     _idata_df = az.extract(idata_4_1).to_dataframe()
     _idata_df, _idata_df.cov(), _idata_df.corr()
-
     return
 
 
@@ -171,7 +147,6 @@ def _(mo):
 @app.cell
 def _(data, plt):
     plt.plot(data.select("height"), data.select("weight"), ".")
-
     return
 
 
@@ -261,7 +236,6 @@ def _(MEAN_W, data, np, plt, stats):
         _ax[2].set_xlabel("weight")
 
     plt.gca()
-
     return
 
 
@@ -278,6 +252,116 @@ def _(mo):
 
     The log-normal prior for beta ensures that the slopes are positive and within a reasonable range.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    #### Using pm.Deterministic
+    """)
+    return
+
+
+@app.cell
+def _(MEAN_W, az, data, np, plt, pm):
+    _x = np.linspace(
+        data.select("weight").min().item(), data.select("weight").max().item(), 100
+    )
+
+    with pm.Model() as model:
+        # Priors
+        _alpha = pm.Normal("alpha", mu=178, sigma=20)
+        # _beta = pm.Uniform("beta", 0, 1)
+        _beta = pm.LogNormal("beta", mu=0, sigma=1)
+        _sigma = pm.Uniform("sigma", lower=0, upper=50)
+    
+        # Linear model
+        # We use a Deterministic to track the values of mu
+        _mu = pm.Deterministic("mu", _alpha + _beta * (_x - MEAN_W))
+    
+        # Likelihood
+        _h = pm.Normal("h", mu=_mu, sigma=_sigma, shape=_x.shape)
+    
+        # Sample prior predictive
+        _idata = pm.sample_prior_predictive(samples=100)
+
+    # Plotting
+    _fig, _ax = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Extract prior samples for mu
+    # Shape is usually (chains, draws, dim). We stack chains and draws.
+    _prior_mu = _idata.prior["mu"].stack(sample=("chain", "draw")).values 
+    _ax[0].plot(_x, _prior_mu, c="k", alpha=0.4)
+    _ax[0].set_title("Prior Regression Lines")
+
+    # Extract prior predictive samples for h
+    _prior_h = _idata["prior"]["h"].stack(sample=("chain", "draw")).values.flatten()
+    az.plot_kde(_prior_h, ax=_ax[1])
+    _ax[1].set_title("Prior Predictive Distribution of h")
+
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    #### Plotting priors by hand
+    """)
+    return
+
+
+@app.cell
+def _(MEAN_W, az, data, np, plt, pm):
+    _x = np.linspace(
+        data.select("weight").min().item(), data.select("weight").max().item(), 100
+    )
+
+    with pm.Model() as _model:
+        # Priors
+        _alpha = pm.Normal("alpha", mu=178, sigma=20)
+        _beta = pm.LogNormal("beta", mu=0, sigma=1)
+        _sigma = pm.Uniform("sigma", lower=0, upper=50)
+    
+        # Linear model
+        # If not using pm.Deterministic, the values of mu are not saved in the inference_data obj at the end.
+        # So it needs to be calculated manually. Saves a lot of memory if simulating a lot of samples.
+        _mu = _alpha + _beta * (_x - MEAN_W)
+    
+        # Likelihood
+        _h = pm.Normal("h", mu=_mu, sigma=_sigma, shape=_x.shape)
+    
+        # Sample prior predictive
+        _idata = pm.sample_prior_predictive(samples=200)
+
+    # 1. Extract the samples (flatten chains and draws)
+    # These will be 1D arrays of length (chains * draws)
+    _alpha_plot = _idata["prior"]["alpha"].to_numpy().flatten()
+    _beta_plot = _idata["prior"]["beta"].to_numpy().flatten()
+
+    # 2. Manually calculate mu
+    # We use numpy broadcasting: 
+    # (N_samples, 1) + (N_samples, 1) * (N_x_points,)
+    _mu_plot = _alpha_plot[:, None] + _beta_plot[:, None] * (_x - MEAN_W)
+
+    # Plotting
+    _fig, _ax = plt.subplots(1, 2, figsize=(12, 5))
+
+    # The "Golden Rule" of plt.plot(x, y). When y is a 2D array, plt interpret every column as a curve to plot.
+    # In this case, every column is a line
+    _ax[0].plot(_x, _mu_plot.T, c="k", alpha=0.4)
+    _ax[0].set_title("Prior Regression Lines")
+
+    # Extract prior predictive samples for h
+    _prior_h = _idata["prior"]["h"].stack(sample=("chain", "draw")).values.flatten()
+    az.plot_kde(_prior_h, ax=_ax[1])
+    _ax[1].set_title("Prior Predictive Distribution of h")
+
+    return
+
+
+@app.cell
+def _():
     return
 
 
@@ -304,7 +388,6 @@ def _(MEAN_W, az, data, pm):
         idata_4_3 = pm.sample(1000, tune=1000)
 
     data_4_3 = az.extract(idata_4_3)
-
     return data_4_3, idata_4_3, m4_3
 
 
@@ -318,7 +401,6 @@ def _(az, idata_4_3):
         data_4_3_df.cov().round(3),
         data_4_3_df.corr().round(3),
     )
-
     return
 
 
@@ -336,7 +418,6 @@ def _(MEAN_W, data, idata_4_3, plt):
     plt.xlabel("Weight")
     plt.ylabel("Height")
     plt.gca()
-
     return
 
 
@@ -355,7 +436,6 @@ def _(mo):
 def _(data, mo):
     n_slider = mo.ui.slider(10, data.shape[0], 10, show_value=True)
     n_slider
-
     return (n_slider,)
 
 
@@ -396,7 +476,6 @@ def _(az, data, n_slider, plt, pm):
     plt.xlabel("Weight")
     plt.ylabel("Height")
     plt.gca()
-
     return
 
 
@@ -413,7 +492,6 @@ def _(MEAN_W, az, data_4_3):
     centre_at = 50
     mu_at_centre = data_4_3["alpha"] + data_4_3["beta"] * (centre_at - MEAN_W)
     az.plot_kde(mu_at_centre.values), az.hdi(mu_at_centre.values, hdi_prob=0.89)
-
     return
 
 
@@ -443,7 +521,6 @@ def _(MEAN_W, data_4_3, np, plt):
     plt.xlabel("weight")
     plt.ylabel("height")
     plt.gca()
-
     return mu_pred_4_3, weight_seq_4_3
 
 
@@ -458,7 +535,6 @@ def _(az, data, mu_pred_4_3, plt, weight_seq_4_3):
     plt.xlabel("weight")
     plt.ylabel("height")
     plt.gca()
-
     return
 
 
@@ -498,7 +574,6 @@ def _(az, data, idata_4_3, m4_3, mu_pred_4_3, plt, pm, weight_seq_4_3):
     plt.xlim(data["weight"].min(), data["weight"].max())
 
     plt.gca()
-
     return
 
 
@@ -533,7 +608,6 @@ def _(MEAN_W, az, data, data_4_3, mu_pred_4_3, np, plt, stats, weight_seq_4_3):
     plt.xlim(data["weight"].min(), data["weight"].max())
 
     plt.gca()
-
     return
 
 
