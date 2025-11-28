@@ -15,7 +15,8 @@ def _():
     import pymc as pm
     import scipy.stats as stats
 
-    np.random.seed(42)
+    RANDOM_SEED = 42
+    rng = np.random.default_rng(RANDOM_SEED)
     az.style.use("arviz-darkgrid")
     az.rcParams["stats.ci_prob"] = 0.89  # sets default credible interval used by arviz
     return az, mo, pl, pm, stats
@@ -203,8 +204,8 @@ def _(az, pm):
 
 
 @app.cell
-def _(az, stats):
-    az.plot_kde(stats.norm.rvs(loc=0, scale=20, size=1000), label="Simple")
+def _():
+    # az.plot_kde(stats.norm.rvs(loc=0, scale=20, size=1000), label="Simple")
     return
 
 
@@ -284,21 +285,40 @@ def _(mo):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    4H1. The weights listed below were recorded in the !Kung census, but heights were not recorded for these individuals. Provide predicted heights and 89% intervals for each of these individuals. That is, fill in the table below, using model-based predictions.
+
+    <span style="color:green;font-weight:bold">Answer:</span>
+    """)
+    return
+
+
 @app.cell
 def _():
-    # 4H1. The weights listed below were recorded in the !Kung census, but heights were not recorded for these individuals. Provide predicted heights and 89% intervals for each of these individuals. That is, fill in the table below, using model-based predictions.
-
     # _weights = np.array([46.95, 43.72, 64.78, 32.59, 54.63])
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    4H2. Select out all the rows in the Howell1 data with ages below 18 years of age. If you do it right, you should end up with a new data frame with 192 rows in it.
+
+    (a) Fit a linear regression to these data, using quap. Present and interpret the estimates. For every 10 units of increase in weight, how much taller does the model predict a child gets?
+
+    (b) Plot the raw data, with height on the vertical axis and weight on the horizontal axis. Superimpose the MAP regression line and 89% interval for the mean. Also superimpose the 89% interval for predicted heights.
+
+    <span style="color:green;font-weight:bold">Answer:</span>
+
+    For every 10 units increase in weight, the model expects an average 27.1 cm increase in height
+    """)
     return
 
 
 @app.cell
 def _(MEAN_W_K, az, data_kids, pm):
-    # 4H2. Select out all the rows in the Howell1 data with ages below 18 years of age. If you do it right, you should end up with a new data frame with 192 rows in it.
-
-    # (a) Fit a linear regression to these data, using quap. Present and interpret the estimates. For every 10 units of increase in weight, how much taller does the model predict a child gets?
-
     with pm.Model() as linear_kids:
         _alpha = pm.Normal("alpha", mu=110, sigma=30)
         _beta = pm.Uniform("beta", lower=0, upper=5)
@@ -312,12 +332,11 @@ def _(MEAN_W_K, az, data_kids, pm):
         idata_kids_4h2 = pm.sample(1_000)
 
     az.summary(idata_kids_4h2, hdi_prob=0.89, kind="stats")
-    return (idata_kids_4h2,)
+    return
 
 
 @app.cell
-def _(az, idata_kids_4h2):
-    az.extract(idata_kids_4h2).to_dataframe()
+def _():
     return
 
 
