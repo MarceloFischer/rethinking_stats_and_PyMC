@@ -1,10 +1,14 @@
 import marimo
 
-__generated_with = "0.17.8"
+__generated_with = "0.18.1"
 app = marimo.App(width="columns")
 
+with app.setup:
+    # Initialization code that runs before all other cells
+    pass
 
-@app.cell(column=0)
+
+@app.cell
 def _():
     import altair as alt
     import arviz as az
@@ -19,7 +23,7 @@ def _():
     rng = np.random.default_rng(RANDOM_SEED)
     az.style.use("arviz-darkgrid")
     az.rcParams["stats.ci_prob"] = 0.89  # sets default credible interval used by arviz
-    return az, mo, pl, pm, stats
+    return az, mo, np, pl, plt, pm, stats
 
 
 @app.cell(hide_code=True)
@@ -310,9 +314,11 @@ def _(mo):
 
     (b) Plot the raw data, with height on the vertical axis and weight on the horizontal axis. Superimpose the MAP regression line and 89% interval for the mean. Also superimpose the 89% interval for predicted heights.
 
+    (c) What aspects of the model fit concern you? Describe the kinds of assumptions you would change, if any, to improve the model. You don’t have to write any new code. Just explain what the model appears to be doing a bad job of, and what you hypothesize would be a better model.
+
     <span style="color:green;font-weight:bold">Answer:</span>
 
-    For every 10 units increase in weight, the model expects an average 27.1 cm increase in height
+    For every 10 units increase in weight, the model expects an average 27.2 cm increase in height (see below)
     """)
     return
 
@@ -331,12 +337,51 @@ def _(MEAN_W_K, az, data_kids, pm):
 
         idata_kids_4h2 = pm.sample(1_000)
 
+        pred_kids = pm.sample_posterior_predictive(idata_kids_4h2)
+
     az.summary(idata_kids_4h2, hdi_prob=0.89, kind="stats")
+    return idata_kids_4h2, pred_kids
+
+
+@app.cell
+def _(az, idata_kids_4h2):
+    az.extract(idata_kids_4h2).to_dataframe(), idata_kids_4h2["posterior"]["alpha"].to_numpy().flatten()[:10]
     return
 
 
 @app.cell
-def _():
+def _(MEAN_W_K, az, data_kids, idata_kids_4h2, np, plt, pred_kids):
+    _alpha_samples = idata_kids_4h2["posterior"]["alpha"].to_numpy().flatten() # shape is (n_samples,)
+    _beta_samples = idata_kids_4h2["posterior"]["beta"].to_numpy().flatten() # shape is (n_samples,)
+    _weight_kids = data_kids.get_column("weight").to_numpy() # shape is (lenght_data,)
+
+    # Raw data
+    plt.scatter(data_kids["weight"], data_kids["height"], c="red", label="raw data")
+
+    # MAP
+    plt.plot(
+        data_kids["weight"],
+        _alpha_samples.mean() + _beta_samples.mean() * (_weight_kids - MEAN_W_K),
+        c="green",
+        lw=3,
+        label="MAP regression line"
+    )
+
+    # 2. Manually calculate mu for each posterior sample
+    # Broadcasting: (n_samples, 1) + (n_samples, 1) * (n_points,)
+    # Result: (n_samples, n_points)
+    _mu_kids = _alpha_samples[:, np.newaxis] + _beta_samples[:, np.newaxis] * (_weight_kids - MEAN_W_K) # shape is (n_samples, lenght_data)
+
+    # 89% HDI mean
+    _mu_hdi = az.hdi(_mu_kids, hdi_prob=0.89)
+    # Both below plot the same thing
+    # az.plot_hdi(x=data_kids["weight"], y=_mu_kids, hdi_prob=0.89, color="green")
+    az.plot_hdi(x=data_kids["weight"], hdi_data=_mu_hdi, color="green")
+
+    # 89% HDI predictions
+    az.plot_hdi(data_kids["weight"], pred_kids["posterior_predictive"]["height"], hdi_prob=0.89)
+
+    plt.legend()
     return
 
 
