@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.17.8"
+__generated_with = "0.18.1"
 app = marimo.App(width="columns")
 
 
@@ -275,14 +275,14 @@ def _(MEAN_W, az, data, np, plt, pm):
         # _beta = pm.Uniform("beta", 0, 1)
         _beta = pm.LogNormal("beta", mu=0, sigma=1)
         _sigma = pm.Uniform("sigma", lower=0, upper=50)
-    
+
         # Linear model
         # We use a Deterministic to track the values of mu
         _mu = pm.Deterministic("mu", _alpha + _beta * (_x - MEAN_W))
-    
+
         # Likelihood
         _h = pm.Normal("h", mu=_mu, sigma=_sigma, shape=_x.shape)
-    
+
         # Sample prior predictive
         _idata = pm.sample_prior_predictive(samples=100)
 
@@ -299,7 +299,6 @@ def _(MEAN_W, az, data, np, plt, pm):
     _prior_h = _idata["prior"]["h"].stack(sample=("chain", "draw")).values.flatten()
     az.plot_kde(_prior_h, ax=_ax[1])
     _ax[1].set_title("Prior Predictive Distribution of h")
-
     return
 
 
@@ -322,15 +321,15 @@ def _(MEAN_W, az, data, np, plt, pm):
         _alpha = pm.Normal("alpha", mu=178, sigma=20)
         _beta = pm.LogNormal("beta", mu=0, sigma=1)
         _sigma = pm.Uniform("sigma", lower=0, upper=50)
-    
+
         # Linear model
         # If not using pm.Deterministic, the values of mu are not saved in the inference_data obj at the end.
         # So it needs to be calculated manually. Saves a lot of memory if simulating a lot of samples.
         _mu = _alpha + _beta * (_x - MEAN_W)
-    
+
         # Likelihood
         _h = pm.Normal("h", mu=_mu, sigma=_sigma, shape=_x.shape)
-    
+
         # Sample prior predictive
         _idata = pm.sample_prior_predictive(samples=200)
 
@@ -356,7 +355,6 @@ def _(MEAN_W, az, data, np, plt, pm):
     _prior_h = _idata["prior"]["h"].stack(sample=("chain", "draw")).values.flatten()
     az.plot_kde(_prior_h, ax=_ax[1])
     _ax[1].set_title("Prior Predictive Distribution of h")
-
     return
 
 
