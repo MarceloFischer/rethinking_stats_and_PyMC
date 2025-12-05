@@ -10,6 +10,7 @@
 #     "scipy==1.16.3",
 # ]
 # ///
+
 import marimo
 
 __generated_with = "0.18.1"
@@ -63,9 +64,10 @@ def _(pl):
 
     MEAN_W_A = data_adults.select("weight").mean().item()
     MEAN_W_K = data_kids.select("weight").mean().item()
+    MEAN_RAW = raw_data.select("weight").mean().item()
 
     data_adults, data_kids
-    return MEAN_W_K, data_kids
+    return MEAN_W_K, data_kids, raw_data
 
 
 @app.cell
@@ -330,7 +332,11 @@ def _(mo):
 
     <span style="color:green;font-weight:bold">Answer:</span>
 
-    For every 10 units increase in weight, the model expects an average 27.2 cm increase in height (see below)
+    (a) For every 10 units increase in weight, the model expects an average 27.2 cm increase in height (see below)
+
+    (b) See below
+
+    (c) The relationship is clearly not linear. The model overestimates for low and high weights and underestimates for middle weights. Getting away from the linear contraint and looking at other types of relationships is needed. The data looks like the log graph, so maybe a log-transform might help the linear equation.
     """)
     return
 
@@ -393,12 +399,99 @@ def _(MEAN_W_K, az, data_kids, idata_kids_4h2, np, plt, pred_kids):
     # 89% HDI predictions
     az.plot_hdi(data_kids["weight"], pred_kids["posterior_predictive"]["height"], hdi_prob=0.89)
 
+    plt.xlabel("Weight (kg)")
+    plt.ylabel("Height (cm)")
     plt.legend()
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    4H3. Suppose a colleague of yours, who works on allometry, glances at the practice problems just above. Your colleague exclaims, “That’s silly. Everyone knows that it’s only the logarithm of body weight that scales with height!” Let’s take your colleague’s advice and see what happens.
+
+    (a) Model the relationship between height (cm) and the natural logarithm of weight (log-kg). Use the entire Howell1 data frame, all 544 rows, adults and non-adults. Fit this model, using quadratic approximation:
+
+    \begin{align*}
+    h_i &\sim \mathrm{Normal}(\mu_i, \sigma)\\
+    \mu_i &= \alpha + \beta \times \log(w_i)\\
+    \alpha &\sim \mathrm{Normal}(178, 20)\\
+    \beta &\sim \mathrm{Log-Normal}(0, 1)\\
+    \sigma &\sim \mathrm{Uniform}(0, 50)
+    \end{align*}
+
+    where $h_i$ is the height of individual $i$ and $w_i$ is the weight (in kg) of individual $i$. Can you interpret the resulting estimates?
+
+    (b) Then use samples from the quadratic approximate posterior of the model in (a) to superimpose on the plot: (1) the predicted mean height as a function of weight, (2) the 97% interval for the mean, and (3) the 97% interval for predicted heights.
+
+    <span style="color:green;font-weight:bold">Answer:</span>
+
+    (a) $\alpha=-22.85$ tells us that when the $\ln(w)=0 \rightarrow w=1 kg$ the average height is -22.85. This is non-informative and doesn't make sense.
+
+    $\beta=46.81$ tells us that every unit increase in the $\ln(w)$ gives us an increase in the mean height of 46.81. So for every 1 ln-kg we expect someone to be, on average, 46.81 cm taller.
+
+    (b)
+    """)
+    return
+
+
 @app.cell
-def _():
+def _(az, pm, raw_data):
+    with pm.Model() as log_model:
+        _alpha = pm.Normal("alpha", 178, 20)
+        _beta = pm.LogNormal("beta", 0, 1)
+        _sigma = pm.Uniform("sigma", 0, 50)
+        _mu = _alpha + _beta * raw_data.get_column("weight").log().to_numpy()
+        _h = pm.Normal("height", mu=_mu, sigma=_sigma, observed=raw_data.get_column("height"))
+
+        idata_raw = pm.sample(1_000)
+
+        pred_raw = pm.sample_posterior_predictive(idata_raw)
+
+    az.summary(idata_raw)
+    return idata_raw, pred_raw
+
+
+@app.cell
+def _(az, idata_raw, np, plt, pred_raw, raw_data):
+    _alpha_samples = idata_raw["posterior"]["alpha"].to_numpy().flatten()
+    _beta_samples = idata_raw["posterior"]["beta"].to_numpy().flatten()
+
+    _, _axs = plt.subplots(1, 2, figsize=(12, 4))
+
+    _axs[0].scatter(raw_data["weight"], raw_data["height"], c="red", label="raw_data")
+
+    # MAP line
+    # !!! Sort the values so that the plot makes sense !!!
+    _sort_idxs = raw_data["weight"].arg_sort()
+    _axs[0].plot(
+        raw_data["weight"][_sort_idxs],
+        _alpha_samples.mean() + _beta_samples.mean() * raw_data["weight"].log()[_sort_idxs],
+        c="green",
+        lw=3,
+        label="MAP regression line"
+    )
+
+    _axs[1].scatter(raw_data["weight"].log(), raw_data["height"], c="blue", label="log_data")
+
+    # MAP line
+    _axs[1].plot(
+        raw_data["weight"].log(),
+        _alpha_samples.mean() + _beta_samples.mean() * raw_data["weight"].log(),
+        c="green",
+        lw=3,
+        label="MAP regression line"
+    )
+
+    # MAP 97% HDI
+    _mu = _alpha_samples[:, np.newaxis] + _beta_samples[:, np.newaxis] * raw_data["weight"].log().to_numpy()
+    _mu_hdi = az.hdi(_mu, hdi_prob=0.97)
+    az.plot_hdi(ax=_axs[1], x=raw_data["weight"].log(), hdi_data=_mu_hdi, color="green")
+
+    # 97% HDI predictions
+    az.plot_hdi(x=raw_data["weight"].log(), y=pred_raw["posterior_predictive"]["height"], hdi_prob=0.97, ax=_axs[1])
+
+    plt.legend()
     return
 
 
