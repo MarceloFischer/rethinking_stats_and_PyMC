@@ -21,6 +21,12 @@ with app.setup:
     pass
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.outline()
+    return
+
+
 @app.cell
 def _():
     import altair as alt
