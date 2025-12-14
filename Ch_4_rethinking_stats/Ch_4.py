@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.18.1"
+__generated_with = "0.18.4"
 app = marimo.App(width="columns")
 
 
@@ -291,7 +291,7 @@ def _(MEAN_W, az, data, np, plt, pm):
 
     # Extract prior samples for mu
     # Shape is usually (chains, draws, dim). We stack chains and draws.
-    _prior_mu = _idata.prior["mu"].stack(sample=("chain", "draw")).values 
+    _prior_mu = _idata.prior["mu"].stack(sample=("chain", "draw")).values
     _ax[0].plot(_x, _prior_mu, c="k", alpha=0.4)
     _ax[0].set_title("Prior Regression Lines")
 
