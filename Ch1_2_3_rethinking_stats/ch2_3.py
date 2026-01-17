@@ -3,6 +3,7 @@
 # dependencies = [
 #     "altair==6.0.0",
 #     "arviz==0.22.0",
+#     "marimo",
 #     "matplotlib==3.10.7",
 #     "numpy==2.3.5",
 #     "polars==1.35.2",
@@ -10,9 +11,10 @@
 #     "scipy==1.16.3",
 # ]
 # ///
+
 import marimo
 
-__generated_with = "0.17.8"
+__generated_with = "0.19.2"
 app = marimo.App(width="columns")
 
 
@@ -70,7 +72,7 @@ def _(mo):
     - Every toss is independent
     - The probability of W in every toss is the same
         - It follows a binomial distribution
-    $$P(W, L \mid p) = \frac{(W + L)!}{W! \, L!} \; p^W (1 - p)^L$$
+    $P(W, L \mid p) = \frac{(W + L)!}{W! \, L!} \; p^W (1 - p)^L$
     """)
     return
 
@@ -784,7 +786,6 @@ def _(az, binom, birth1, birth2, grid_approx_ch2, np):
     # plt.show()
 
     # 3H5. The model assumes that sex of first and second births are independent. To check this assumption, focus now on second births that followed female first borns. Compare 10,000 simulated counts of boys to only those second births that followed girls. To do this correctly, you need to count the number of first borns who were girls and simulate that many births, 10,000 times. Compare the counts of boys in your simulations to the actual observed count of boys following girls. How does the model look in this light? Any guesses what is going on in these data?
-
     return
 
 
