@@ -2,19 +2,19 @@
 # requires-python = ">=3.13"
 # dependencies = [
 #     "altair==6.0.0",
-#     "arviz==0.22.0",
+#     "arviz==0.23.1",
 #     "marimo",
 #     "matplotlib==3.10.7",
 #     "numpy==2.3.5",
 #     "polars==1.35.2",
-#     "pymc==5.26.1",
+#     "pymc==5.27.0",
 #     "scipy==1.16.3",
 # ]
 # ///
 
 import marimo
 
-__generated_with = "0.19.2"
+__generated_with = "0.19.4"
 app = marimo.App(width="columns")
 
 
@@ -117,7 +117,12 @@ def _(mo):
 
 @app.cell
 def _(alt, binom, np, pl):
-    def grid_approx_ch2(p_grid_size: int = 51, prior: str = "uniform", success: int = 6, tosses: int = 9):
+    def grid_approx_ch2(
+        p_grid_size: int = 51,
+        prior: str = "uniform",
+        success: int = 6,
+        tosses: int = 9,
+    ):
         # define a grid. Possible values for p
         p_grid = np.linspace(0, 1, p_grid_size)
         # define a prior.
@@ -152,7 +157,9 @@ def _(alt, binom, np, pl):
                 y=alt.Y("posterior_prob:Q", title="Posterior Probability"),
                 tooltip=["prob_water", "posterior_prob", "prior", "likelihood"],
             )
-            .properties(title=f"Posterior with {len(p_grid)} Points for {tosses} Trials")
+            .properties(
+                title=f"Posterior with {len(p_grid)} Points for {tosses} Trials"
+            )
             .interactive()
         )
         return df, chart
@@ -207,7 +214,9 @@ def _(grid_approx_ch2, mo):
 @app.cell
 def _(grid_approx_ch2, mo):
     # W, W, W, L
-    ex_m1_2_df, chart_ex_m1_2 = grid_approx_ch2(p_grid_size=100, success=3, tosses=4)
+    ex_m1_2_df, chart_ex_m1_2 = grid_approx_ch2(
+        p_grid_size=100, success=3, tosses=4
+    )
 
     mo.ui.altair_chart(chart_ex_m1_2)
     return
@@ -216,7 +225,9 @@ def _(grid_approx_ch2, mo):
 @app.cell
 def _(grid_approx_ch2, mo):
     # L, W, W, L, W, W, W
-    ex_m1_3_df, chart_ex_m1_3 = grid_approx_ch2(p_grid_size=100, success=5, tosses=7)
+    ex_m1_3_df, chart_ex_m1_3 = grid_approx_ch2(
+        p_grid_size=100, success=5, tosses=7
+    )
 
     mo.ui.altair_chart(chart_ex_m1_3)
     return
@@ -233,7 +244,9 @@ def _(mo):
 @app.cell
 def _(grid_approx_ch2, mo):
     # W, W, W
-    ex_m2_df, chart_ex_m2 = grid_approx_ch2(p_grid_size=100, prior="step", success=3, tosses=3)
+    ex_m2_df, chart_ex_m2 = grid_approx_ch2(
+        p_grid_size=100, prior="step", success=3, tosses=3
+    )
 
     mo.ui.altair_chart(chart_ex_m2)
     return
@@ -242,7 +255,9 @@ def _(grid_approx_ch2, mo):
 @app.cell
 def _(grid_approx_ch2, mo):
     # W, W, W, L
-    ex_m2_2_df, chart_ex_m2_2 = grid_approx_ch2(p_grid_size=100, prior="step", success=3, tosses=4)
+    ex_m2_2_df, chart_ex_m2_2 = grid_approx_ch2(
+        p_grid_size=100, prior="step", success=3, tosses=4
+    )
 
     mo.ui.altair_chart(chart_ex_m2_2)
     return
@@ -251,7 +266,9 @@ def _(grid_approx_ch2, mo):
 @app.cell
 def _(grid_approx_ch2, mo):
     # L, W, W, L, W, W, W
-    ex_m2_3_df, chart_ex_m2_3 = grid_approx_ch2(p_grid_size=100, prior="step", success=5, tosses=7)
+    ex_m2_3_df, chart_ex_m2_3 = grid_approx_ch2(
+        p_grid_size=100, prior="step", success=5, tosses=7
+    )
 
     mo.ui.altair_chart(chart_ex_m2_3)
     return
@@ -273,7 +290,9 @@ def _():
     p_l_mars = 1 - p_w_mars
     p_earth, p_mars = 0.5, 0.5
 
-    prob_earth_given_land = (p_earth * p_l_earth) / (p_earth * p_l_earth + p_mars * p_l_mars)
+    prob_earth_given_land = (p_earth * p_l_earth) / (
+        p_earth * p_l_earth + p_mars * p_l_mars
+    )
     prob_earth_given_land
     return
 
@@ -334,7 +353,15 @@ def _(np, pl):
     # Sum probabilities for BB cards
     bb_probability_6 = posterior[card_6 == "BB"].sum()
 
-    ex_6_df = pl.DataFrame({"card": card_6, "ways": ways_6, "prior": prior_6, "likelihood": likelihood_6, "prob_bb": posterior})
+    ex_6_df = pl.DataFrame(
+        {
+            "card": card_6,
+            "ways": ways_6,
+            "prior": prior_6,
+            "likelihood": likelihood_6,
+            "prob_bb": posterior,
+        }
+    )
     ex_6_df
     return
 
@@ -376,7 +403,9 @@ def _(mo):
 
 @app.cell
 def _(grid_approx_ch2, np, pl):
-    ch3_post_df, ch3_post_chart = grid_approx_ch2(1_001, "uniform", success=6, tosses=9)
+    ch3_post_df, ch3_post_chart = grid_approx_ch2(
+        1_001, "uniform", success=6, tosses=9
+    )
 
     # samples used for a lot of the problems
     samples_easy = np.random.choice(
@@ -458,7 +487,9 @@ def _(grid_approx_ch2, np, pl):
     # 3M1. Suppose the globe tossing data had turned out to be 8 water in 15 tosses. Construct the posterior distribution, using grid approximation. Use the same flat prior as before.
 
 
-    ch3_m1_to_4_df, chart_ch3_m1_to_4 = grid_approx_ch2(p_grid_size=1_001, prior="uniform", success=8, tosses=15)
+    ch3_m1_to_4_df, chart_ch3_m1_to_4 = grid_approx_ch2(
+        p_grid_size=1_001, prior="uniform", success=8, tosses=15
+    )
 
     # samples used for a lot of the problems
     samples_medium = np.random.choice(
@@ -748,7 +779,9 @@ def _(az, binom, birth1, birth2, grid_approx_ch2, np):
     _success = np.concat((birth1, birth2)).sum()
 
     # using the function made for chapter 2
-    ch3_h1_df, chart_ch3_h1 = grid_approx_ch2(p_grid_size=101, prior="uniform", success=_success, tosses=_tosses)
+    ch3_h1_df, chart_ch3_h1 = grid_approx_ch2(
+        p_grid_size=101, prior="uniform", success=_success, tosses=_tosses
+    )
     # 3h1 = ch3_h1_df.filter(pl.col("posterior_prob") == pl.col("posterior_prob").max()).select("prob_water")
 
     _p_grid = np.linspace(0, 1, 101)
