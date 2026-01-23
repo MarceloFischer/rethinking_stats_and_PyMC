@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.18.4"
+__generated_with = "0.19.5"
 app = marimo.App(width="columns")
 
 
@@ -49,8 +49,10 @@ def _(pl):
         "/home/marcelo/git/rethinking_stats_and_PyMC/data/Howell1.csv", separator=";"
     )
 
+
     def filter_data(df: pl.DataFrame):
         return df.filter(pl.col("age") >= 18)
+
 
     data = raw_data.pipe(filter_data)
 
@@ -110,15 +112,11 @@ def _(mo):
 def _(data, pm):
     with pm.Model() as m4_1:
         # initival can be given to tell the algo where to start looking for the peak
-        _mu = pm.Normal(
-            "mu", mu=178, sigma=20, initval=data.select("height").mean().item()
-        )
+        _mu = pm.Normal("mu", mu=178, sigma=20, initval=data.select("height").mean().item())
         _sigma = pm.Uniform(
             "sigma", lower=0, upper=50, initval=data.select("height").std().item()
         )
-        _height = pm.Normal(
-            "height", mu=_mu, sigma=_sigma, observed=data.select("height")
-        )
+        _height = pm.Normal("height", mu=_mu, sigma=_sigma, observed=data.select("height"))
         idata_4_1 = pm.sample(1_000, tune=1_000)
     return (idata_4_1,)
 
@@ -339,7 +337,7 @@ def _(MEAN_W, az, data, np, plt, pm):
     _beta_plot = _idata["prior"]["beta"].to_numpy().flatten()
 
     # 2. Manually calculate mu
-    # We use numpy broadcasting: 
+    # We use numpy broadcasting:
     # (N_samples, 1) + (N_samples, 1) * (N_x_points,)
     _mu_plot = _alpha_plot[:, None] + _beta_plot[:, None] * (_x - MEAN_W)
 
@@ -464,8 +462,7 @@ def _(az, data, n_slider, plt, pm):
     for _i in range(_n_lines):
         plt.plot(
             _data_n["weight"],
-            data_N["alpha"].item(_i)
-            + data_N["beta"].item(_i) * (_data_n["weight"] - mean_n),
+            data_N["alpha"].item(_i) + data_N["beta"].item(_i) * (_data_n["weight"] - mean_n),
             alpha=0.2,
             color="orange",
         )
@@ -508,9 +505,7 @@ def _(MEAN_W, data_4_3, np, plt):
     mu_pred_4_3 = np.zeros((len(weight_seq_4_3), _n_samples_thinend))
     for _i, w in enumerate(weight_seq_4_3):
         # mu_pred_4_3[_i] selects row _i from the mu_pred_4_3 array. So every row in this array is a distribution of heights for each weight in weight_seq_4_3
-        mu_pred_4_3[_i] = data_4_3_thinned["alpha"] + data_4_3_thinned["beta"] * (
-            w - MEAN_W
-        )
+        mu_pred_4_3[_i] = data_4_3_thinned["alpha"] + data_4_3_thinned["beta"] * (w - MEAN_W)
 
     # to calculate the mean height for each weight, we can just use mu_pred_4_3.mean(axis=1). This would average each row of the mu_pred_4_3 array.
 
