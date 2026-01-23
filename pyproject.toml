@@ -5,24 +5,5 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "duckdb>=1.4.0",
-    "google-genai>=1.25.0",
-    "ipython>=9.4.0",
-    "marimo[recommended]>=0.19.0",
-    "mcp>=1",
-    "numpy>=2.3.1",
-    "polars[pyarrow]>=1.31.0",
-    "pydantic>=2",
-    "pymc==5.26.1",
-    "pytest>=8.4.1",
-    "python-lsp-ruff>=2.2.2",
-    "python-lsp-server>=1.13.0",
-    "pyzmq>=27.1.0",
-    "ruff>=0.12.2",
-    "scipy>=1.16.0",
-    "sqlglot>=27.20.0",
-    "vega-datasets>=0.9.0",
-    "vegafusion>=2.0.2",
-    "vl-convert-python>=1.8.0",
-    "websockets>=15.0.1",
+    "marimo[recomended]>=0.19.4",
 ]
