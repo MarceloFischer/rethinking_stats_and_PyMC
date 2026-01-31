@@ -1,3 +1,15 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "altair==6.0.0",
+#     "arviz==0.23.1",
+#     "matplotlib==3.10.8",
+#     "numpy==2.3.5",
+#     "polars==1.37.1",
+#     "pymc==5.27.0",
+#     "scipy==1.17.0",
+# ]
+# ///
 import marimo
 
 __generated_with = "0.19.5"
