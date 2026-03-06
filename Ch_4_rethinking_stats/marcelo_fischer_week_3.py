@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.20.2"
+__generated_with = "0.20.4"
 app = marimo.App(width="columns")
 
 
@@ -14,13 +14,13 @@ def _():
     import polars as pl
     import pymc as pm
     import scipy as sp
-    from scipy.stats import beta, binom
+    from scipy.stats import beta, binom, norm
 
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
 
     az.style.use("arviz-darkgrid")
-    return az, mo, np, pl, plt, pm
+    return RANDOM_SEED, az, mo, norm, np, pl, plt, pm
 
 
 @app.cell
@@ -34,17 +34,17 @@ def _(pl):
         return df.with_columns(age_centered=pl.col("age") - pl.mean("age"))
 
 
-    def create_age_indicator(df: pl.DataFrame) -> pl.DataFrame:
-        return df.with_columns(is_adult=(pl.col("age") >= 18).cast(pl.Int32))
+    def create_age_indicator(df: pl.DataFrame, age: int) -> pl.DataFrame:
+        return df.with_columns(is_adult=(pl.col("age") >= age).cast(pl.Int32))
 
 
     def filter_age(df: pl.DataFrame, age: int) -> pl.DataFrame:
         return df.filter(pl.col("age") >= age)
 
 
-    data = df.pipe(center_age).pipe(create_age_indicator)
+    data = df.pipe(center_age).pipe(create_age_indicator, age=18)
 
-    df_adults = df.pipe(filter_age, 18).pipe(center_age)
+    df_adults = df.pipe(filter_age, age=18).pipe(center_age)
 
     data
     return (df_adults,)
@@ -143,9 +143,7 @@ def _(az, np, pl, plt, pm):
             )
 
             # ===== LIKELIHOOD =====
-            height = pm.Normal(
-                "height", mu=mu, sigma=sigma, observed=data["height"], dims="obs"
-            )
+            height = pm.Normal("height", mu=mu, sigma=sigma, dims="obs")
 
             # ===== PRIOR PREDICTIVE =====
             idata_prior = pm.sample_prior_predictive(samples=10)
@@ -201,6 +199,14 @@ def _():
 @app.cell(column=1, hide_code=True)
 def _(mo):
     mo.md(r"""
+    ## PyMC Models
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ### Only Adults Linear Model
     """)
     return
@@ -244,6 +250,102 @@ def _(mo):
 
 @app.cell
 def _():
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Simpler Models
+    """)
+    return
+
+
+@app.cell
+def _(RANDOM_SEED, norm, plt, pm):
+    # simple model that allows for the age to stop growing to vary
+    # Constant accelerated growth until a specific age, then plateau until death
+    # does not allow to shrink at older ages
+    def generate_prior_lines(n_samples: int = 10) -> None:
+        alpha = norm.rvs(50, 5, n_samples)
+        beta = norm.rvs(5, 1, n_samples)
+        age_terminal_growth = norm.rvs(20, 2, n_samples)
+
+        plt.figure(figsize=(10, 5))
+        for i in range(n_samples):
+            plt.plot(
+                [0, age_terminal_growth[i]],
+                [alpha[i] + beta[i] * 0, alpha[i] + beta[i] * age_terminal_growth[i]],
+                color="red",
+                linewidth=2,
+            )
+            plt.plot(
+                [age_terminal_growth[i], 100],
+                [
+                    alpha[i] + beta[i] * age_terminal_growth[i],
+                    alpha[i] + beta[i] * age_terminal_growth[i],
+                ],
+                color="red",
+                linewidth=2,
+            )
+
+        return plt.gca()
+
+
+    def generate_prior_lines_pymc(n_samples: int = 10) -> None:
+        with pm.Model() as _model:
+            alpha = pm.Normal("alpha", mu=50, sigma=5)
+            beta = pm.Normal("beta", mu=5, sigma=1)
+            age_terminal_growth = pm.Normal("age_terminal_growth", mu=20, sigma=2)
+            idata = pm.sample_prior_predictive(samples=n_samples, random_seed=RANDOM_SEED)
+
+        prior = idata.prior.stack(sample=("chain", "draw"))
+        alphas = prior["alpha"].values
+        betas = prior["beta"].values
+        ages_terminal_growth = prior["age_terminal_growth"].values
+
+        plt.figure(figsize=(10, 5))
+        for i in range(n_samples):
+            # Growth phase: 0 to 20
+            plt.plot(
+                [0, ages_terminal_growth[i]],
+                [alphas[i] + betas[i] * 0, alphas[i] + betas[i] * ages_terminal_growth[i]],
+                color="red",
+                linewidth=2,
+            )
+            # Plateau phase: ages_terminal_growth[i] to 100
+            plt.plot(
+                [ages_terminal_growth[i], 100],
+                [
+                    alphas[i] + betas[i] * ages_terminal_growth[i],
+                    alphas[i] + betas[i] * ages_terminal_growth[i],
+                ],
+                color="red",
+                linewidth=2,
+            )
+
+        plt.xlabel("Age")
+        plt.ylabel("Height (cm)")
+        plt.title(f"PyMC Prior Predictive Lines (n={n_samples})")
+        return plt.gca()
+
+    return generate_prior_lines, generate_prior_lines_pymc
+
+
+@app.cell
+def _(generate_prior_lines):
+    generate_prior_lines()
+    return
+
+
+@app.cell
+def _(generate_prior_lines_pymc):
+    generate_prior_lines_pymc()
     return
 
 
