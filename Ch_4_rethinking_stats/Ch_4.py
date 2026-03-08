@@ -10,9 +10,10 @@
 #     "scipy==1.17.0",
 # ]
 # ///
+
 import marimo
 
-__generated_with = "0.19.5"
+__generated_with = "0.20.4"
 app = marimo.App(width="columns")
 
 
@@ -40,11 +41,11 @@ def _():
     import pymc as pm
     import scipy.stats as stats
 
-    RANDOM_SEED = 42
+    RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
     az.style.use("arviz-darkgrid")
     az.rcParams["stats.ci_prob"] = 0.89  # sets default credible interval used by arviz
-    return az, mo, np, pl, plt, pm, stats
+    return az, mo, np, pl, plt, pm, rng, stats
 
 
 @app.cell(hide_code=True)
@@ -381,7 +382,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(MEAN_W, az, data, pm):
     with pm.Model() as m4_3:
         _alpha = pm.Normal("alpha", mu=178, sigma=20)
@@ -628,6 +629,121 @@ def _():
 
 @app.cell
 def _():
+    return
+
+
+@app.cell(column=3, hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## End of Chapter Problems
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Easy
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    \[
+    y_i \sim \mathrm{Normal}(\mu, \sigma)
+    \]
+    \[
+    \mu \sim \mathrm{Normal}(0, 10)
+    \]
+    \[
+    \sigma \sim \mathrm{Exponential}(1)
+    \]
+    """)
+    return
+
+
+@app.cell
+def _():
+    # 1 In the model definition below, which line is the likelihood?
+
+    # y_i ~ Normal(mu, sigma)
+    return
+
+
+@app.cell
+def _():
+    # 2 In the model definition just above, how many parameters are in the posterior distribution?
+
+    # Two, the mean and the standard deviation.
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Medium
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    \[
+    y_i \sim \mathrm{Normal}(\mu, \sigma)
+    \]
+    \[
+    \mu \sim \mathrm{Normal}(0, 10)
+    \]
+    \[
+    \sigma \sim \mathrm{Exponential}(1)
+    \]
+    """)
+    return
+
+
+@app.cell
+def _(az, plt, rng):
+    # 1 For the model definition above, simulate observed y values from the prior (not the posterior).
+    def m1():
+        n = 1000
+        # mu = stats.norm.rvs(0, 10, size=n, random_state=rng)
+        # sigma = stats.expon.rvs(1, size=n, random_state=rng)
+
+        # better performance
+        mu = rng.normal(0, 10, n)
+        sigma = rng.exponential(1, n)
+
+        # az.plot_kde(stats.norm.rvs(loc=mu, scale=sigma))
+        az.plot_kde(rng.normal(loc=mu, scale=sigma))
+        return plt.gca()
+
+
+    # m1()
+    return
+
+
+@app.cell
+def _():
+    # 4 A sample of students is measured for height each year for 3 years. After the third year, you want to fit a linear regression predicting height using year as a predictor. Write down the mathematical model definition for this regression, using any variable names and priors you choose. Be prepared to defend your choice of priors.
+
+    # this and all other medium questions done on paper
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Hard
+    """)
+    return
+
+
+@app.cell
+def _():
+    # 1
     return
 
 
