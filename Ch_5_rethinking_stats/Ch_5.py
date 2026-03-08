@@ -20,11 +20,11 @@
 
 import marimo
 
-__generated_with = "0.19.2"
+__generated_with = "0.20.4"
 app = marimo.App(width="columns")
 
 
-@app.cell
+@app.cell(column=0)
 def _():
     import altair as alt
     import arviz as az
@@ -36,12 +36,11 @@ def _():
     import scipy.stats as stats
     from pathlib import Path
 
-    RANDOM_SEED = 42
+    RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
     az.style.use("arviz-darkgrid")
-    az.rcParams["stats.ci_prob"] = (
-        0.89  # sets default credible interval used by arviz
-    )
+
+    az.rcParams["stats.ci_prob"] = 0.89  # sets default credible interval used by arviz
     return Path, az, np, pl, plt, pm
 
 
@@ -54,9 +53,7 @@ def _(Path, pl):
     # add standardised columns
     data = data.with_columns(
         [
-            ((pl.col(col) - pl.col(col).mean()) / pl.col(col).std()).alias(
-                f"{col}_std"
-            )
+            ((pl.col(col) - pl.col(col).mean()) / pl.col(col).std()).alias(f"{col}_std")
             for col in ["Divorce", "MedianAgeMarriage", "Marriage"]
         ]
     )
@@ -100,9 +97,7 @@ def _(data, np, plt, pm):
 
         m5_1_idata = pm.sample(1000)
 
-    _x = np.linspace(
-        data["MedianAgeMarriage_std"].min(), data["MedianAgeMarriage_std"].max()
-    )
+    _x = np.linspace(data["MedianAgeMarriage_std"].min(), data["MedianAgeMarriage_std"].max())
 
     _a_plot = _prior_samples["prior"]["a"].to_numpy().flatten()
     _bA_plot = _prior_samples["prior"]["bA"].to_numpy().flatten()
@@ -140,8 +135,7 @@ def _(az, data, m5_1_idata, np, plt):
     _divorce_std = data["Divorce"].std()
 
     _map_line = (
-        _a_samples.mean()
-        + _bA_samples.mean() * data["MedianAgeMarriage_std"].to_numpy()
+        _a_samples.mean() + _bA_samples.mean() * data["MedianAgeMarriage_std"].to_numpy()
     ) * _divorce_std + _divorce_mean
 
     plt.plot(
@@ -163,9 +157,7 @@ def _(az, data, m5_1_idata, np, plt):
 
     # 89% HDI mean
     _mu_hdi = az.hdi(_mu, hdi_prob=0.89)
-    az.plot_hdi(
-        x=data["MedianAgeMarriage"].to_numpy(), hdi_data=_mu_hdi, color="green"
-    )
+    az.plot_hdi(x=data["MedianAgeMarriage"].to_numpy(), hdi_data=_mu_hdi, color="green")
 
     plt.xlabel("MedianAgeMarriage")
     plt.ylabel("Divorce")
@@ -177,6 +169,11 @@ def _(az, data, m5_1_idata, np, plt):
 @app.cell
 def _(az, m5_1_idata):
     az.summary(m5_1_idata)
+    return
+
+
+@app.cell(column=1)
+def _():
     return
 
 
