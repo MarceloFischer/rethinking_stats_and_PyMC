@@ -17,12 +17,7 @@ __generated_with = "0.20.4"
 app = marimo.App(width="columns")
 
 
-@app.cell(column=0)
-def _():
-    return
-
-
-@app.cell(hide_code=True)
+@app.cell(column=0, hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Imports and Constants
@@ -116,7 +111,9 @@ def _(az, stats):
 @app.cell(column=1, hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Quadratic Approximation
+    ## MCMC (Quadratic Approximation)
+
+    not using quap and MCMC is implemented in PyMC and will be used in future, more complex models.
     """)
     return
 
