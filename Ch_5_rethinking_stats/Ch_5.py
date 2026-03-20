@@ -20,7 +20,7 @@
 
 import marimo
 
-__generated_with = "0.20.4"
+__generated_with = "0.21.1"
 app = marimo.App(width="columns")
 
 
@@ -41,7 +41,9 @@ def _():
     rng = np.random.default_rng(RANDOM_SEED)
     plt.style.use("fivethirtyeight")
 
-    az.rcParams["stats.ci_prob"] = 0.89  # sets default credible interval used by arviz
+    az.rcParams["stats.ci_prob"] = (
+        0.89  # sets default credible interval used by arviz
+    )
     return Path, az, mo, np, operator, pl, plt, pm, rng
 
 
@@ -62,7 +64,7 @@ def _(Path, pl):
     HOWELL_PATH = Path(__file__).parent.parent / "data" / "Howell1.csv"
 
     # women=0 and men=1 in the dataset
-    SEX = ["women", "men"]
+    SEX = ["F", "M"]
 
     raw_waffle_data = pl.read_csv(WAFFLE_PATH, separator=";")
     raw_howell_data = pl.read_csv(HOWELL_PATH, separator=";")
@@ -80,14 +82,18 @@ def _(mo):
 @app.cell
 def _(operator, pl):
     def cols_to_lowercase(dataf: pl.DataFrame) -> pl.DataFrame:
-        return dataf.rename({col: col[0].lower() + col[1:] for col in dataf.columns})
+        return dataf.rename(
+            {col: col[0].lower() + col[1:] for col in dataf.columns}
+        )
 
 
     def std_cols_of_interest(dataf: pl.DataFrame) -> pl.DataFrame:
         # add standardised columns
         return dataf.with_columns(
             [
-                ((pl.col(col) - pl.col(col).mean()) / pl.col(col).std()).alias(f"{col}_std")
+                ((pl.col(col) - pl.col(col).mean()) / pl.col(col).std()).alias(
+                    f"{col}_std"
+                )
                 for col in ["divorce", "medianAgeMarriage", "marriage"]
             ]
         )
@@ -128,7 +134,9 @@ def _(
     raw_waffle_data,
     std_cols_of_interest,
 ):
-    waffle_data = raw_waffle_data.pipe(cols_to_lowercase).pipe(std_cols_of_interest)
+    waffle_data = raw_waffle_data.pipe(cols_to_lowercase).pipe(
+        std_cols_of_interest
+    )
 
     howell_adults = raw_howell_data.pipe(filter_by_comparison, "age", 18, ">=")
 
@@ -148,8 +156,16 @@ def _(pl, plt, raw_howell_data):
         adult_howell = raw_howell_data.filter(is_adult)
         child_howell = raw_howell_data.filter(~is_adult)
 
-        plt.scatter(adult_howell["height"], adult_howell["weight"], label="over 18")
-        plt.scatter(child_howell["height"], child_howell["weight"], label="under 18")
+        plt.scatter(
+            adult_howell["height"],
+            adult_howell["weight"],
+            label="over 18",
+        )
+        plt.scatter(
+            child_howell["height"],
+            child_howell["weight"],
+            label="under 18",
+        )
 
         plt.xlabel("Height (cm)")
         plt.ylabel("Weight (kg)")
@@ -215,8 +231,17 @@ def _(mo):
 
 
 @app.cell
-def _(SEX, az, howell_adults, np, pl, plt, pm, rng):
+def _(SEX, az, pl, plt):
     def plot_howell_HW_dist(data: pl.DataFrame):
+        """
+        Plots the relationship between Height and Weight and their distributions split by sex.
+
+        Args:
+            data: A polars DataFrame containing 'height', 'weight', and 'male' columns.
+
+        Returns:
+            The current matplotlib Axes object.
+        """
         fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 
         plt.sca(axs[0])
@@ -241,11 +266,15 @@ def _(SEX, az, howell_adults, np, pl, plt, pm, rng):
                     label=sex,
                     color=f"C{sex_idx2}",
                 )
-            plt.ylabel(f"{col}".capitalize())
+            plt.xlabel(f"{col}".capitalize())
             plt.title(f"Dist. of {col.capitalize()} Split by Sex")
         return plt.gca()
 
+    return (plot_howell_HW_dist,)
 
+
+@app.cell
+def _(np, pl, rng):
     def sim_synthetic_people(
         sex_arr: np.array,
         alphas: np.array = np.array([0, 0]),
@@ -274,18 +303,61 @@ def _(SEX, az, howell_adults, np, pl, plt, pm, rng):
 
         return pl.DataFrame({"weight": w, "height": h, "male": sex_arr})
 
+    return (sim_synthetic_people,)
 
+
+@app.cell
+def _(pl, rng, sim_synthetic_people):
+    def howell_SW_testing(
+        n_samples: int = 200, **kwargs
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        """
+        Simulates balanced synthetic datasets for females and males for testing.
+
+        Args:
+            n_samples: Number of samples to generate per sex group.
+            **kwargs: Arguments passed to sim_synthetic_people.
+
+        Returns:
+            A tuple of two Polars DataFrames: (female_sim, male_sim).
+        """
+        females = rng.binomial(n=1, p=0, size=n_samples)
+        males = rng.binomial(n=1, p=1, size=n_samples)
+
+        sim_F = sim_synthetic_people(sex_arr=females, **kwargs)
+        sim_M = sim_synthetic_people(sex_arr=males, **kwargs)
+
+        return sim_F, sim_M
+
+    return (howell_SW_testing,)
+
+
+@app.cell
+def _(SEX, az, howell_adults, np, pl, pm, rng):
     def fit_total_effect_sex_weight(
-        data: pl.DataFrame = howell_adults, draws: int = 100, prior: bool = True
-    ) -> pm.Model:
+        data: pl.DataFrame = howell_adults,
+        draws: int = 100,
+        prior: bool = True,
+    ) -> tuple[az.InferenceData, pm.Model]:
+        """
+        Fits a Bayesian model to estimate the total effect of sex on weight.
+
+        Args:
+            data: Polars DataFrame containing the data.
+            draws: Number of samples to draw.
+            prior: If True, samples from the prior predictive; otherwise fits to data.
+
+        Returns:
+            A tuple containing the ArviZ InferenceData and the PyMC Model.
+        """
         coords = {
             "obs": np.arange(data.shape[0]),
-            "sex": ["F", "M"],  # Named categories
+            "sex": SEX,  # Named categories
         }
 
         with pm.Model(coords=coords) as sex_weight_model:
             ## Data ##
-            sex_idx = pm.Data("sex_cat", data["male"].to_numpy(), dims="obs")
+            sex_idx = pm.Data("sex_idx", data["male"].to_numpy(), dims="obs")
 
             ## Priors ##
             alpha = pm.Normal("alpha", mu=60, sigma=10, dims="sex")
@@ -304,46 +376,122 @@ def _(SEX, az, howell_adults, np, pl, plt, pm, rng):
                 weight = pm.Normal("weight", mu=mu, sigma=sigma)
                 idata = pm.sample_prior_predictive(draws, random_seed=rng)
             else:
-                weight = pm.Normal("weight", mu=mu, sigma=sigma, observed=data["weight"])
+                weight = pm.Normal(
+                    "weight", mu=mu, sigma=sigma, observed=data["weight"]
+                )
                 idata = pm.sample(draws, random_seed=rng)
 
-            return idata
+            return idata, sex_weight_model
+
+    return (fit_total_effect_sex_weight,)
 
 
-    def howell_SW_testing(
-        n_samples: int = 200, **kwargs
-    ) -> tuple[pl.DataFrame, pl.DataFrame]:
-        females = rng.binomial(n=1, p=0, size=n_samples)
-        males = rng.binomial(n=1, p=1, size=n_samples)
+@app.cell
+def _(SEX, az, howell_adults, np, pl, pm, rng):
+    def fit_direct_effect_sex_weight(
+        data: pl.DataFrame = howell_adults,
+        draws: int = 100,
+        prior: bool = True,
+    ) -> tuple[az.InferenceData, pm.Model]:
+        """
+        Fits a Bayesian model to estimate the direct effect of sex on weight, controlling for height.
 
-        sim_F = sim_synthetic_people(sex_arr=females, **kwargs)
-        sim_M = sim_synthetic_people(sex_arr=males, **kwargs)
+        Args:
+            data: Polars DataFrame containing the data.
+            draws: Number of samples to draw.
+            prior: If True, samples from the prior predictive; otherwise fits to data.
 
-        return sim_F, sim_M
+        Returns:
+            A tuple containing the ArviZ InferenceData and the PyMC Model.
+        """
+        coords = {
+            "obs": np.arange(data.shape[0]),
+            "sex": SEX,  # Named categories
+        }
+
+        with pm.Model(coords=coords) as direct_sex_weight_model:
+            ## Data ##
+            sex_idx = pm.Data("sex_idx", data["male"].to_numpy(), dims="obs")
+            height = pm.Data("height", data["height"].to_numpy(), dims="obs")
+            h_bar = pm.Data("h_bar", data["height"].mean())
+
+            ## Priors ##
+            alpha = pm.Normal("alpha", mu=60, sigma=10, dims="sex")
+            beta = pm.Uniform("beta", lower=0, upper=1, dims="sex")
+            sigma = pm.Uniform("sigma", lower=0, upper=10)
+
+            ## Likelihood ##
+            # MEMORY EFFICIENT: Define mu as a temporary variable (no pm.Deterministic)
+            # This is used for math but NOT saved in the final results
+            mu = alpha[sex_idx] + beta[sex_idx] * (height - h_bar)
+
+            pm.Deterministic("sex_diff", alpha[1] - alpha[0])
+
+            if prior:
+                weight = pm.Normal("weight", mu=mu, sigma=sigma)
+                idata = pm.sample_prior_predictive(draws, random_seed=rng)
+            else:
+                weight = pm.Normal(
+                    "weight",
+                    mu=mu,
+                    sigma=sigma,
+                    observed=data["weight"],
+                    dims="obs",
+                )
+                idata = pm.sample(draws, random_seed=rng)
+
+            return idata, direct_sex_weight_model
+
+    return (fit_direct_effect_sex_weight,)
 
 
-    def plot_post_dist_mean_and_weight_howell(idata: az.InferenceData) -> plt.Axes:
+@app.cell
+def _(SEX, az, np, plt, rng):
+    def plot_post_dist_mean_and_weight_howell(
+        idata: az.InferenceData,
+    ) -> plt.Axes:
+        """
+        Visualizes the posterior distribution of means, observed weights, and contrasts by sex.
+
+        Args:
+            idata: ArviZ InferenceData containing posterior and observed data.
+
+        Returns:
+            The current matplotlib Axes object.
+        """
         fig, axs = plt.subplots(2, 2, figsize=(15, 8))
 
+        ########################################
+        # Posterior Dist of Mean Weight by Sex #
+        ########################################
         plt.sca(axs[0, 0])
-        az.plot_dist(idata["posterior"]["alpha"].sel(sex="F"), color="C0", label="Female")
-        az.plot_dist(idata["posterior"]["alpha"].sel(sex="M"), color="C1", label="Male")
+        for idx, s in enumerate(SEX):
+            az.plot_dist(
+                idata["posterior"]["alpha"].sel(sex=s),
+                color=f"C{idx}",
+                label=f"{s}",
+            )
         plt.title("Posterior Dist of Mean Weight by Sex")
         plt.xlabel("Mean Weight (kg)")
         plt.ylabel("Density")
         plt.legend()
 
+        ####################
+        # Posterior Weight #
+        ####################
         plt.sca(axs[0, 1])
-        _obs_weights_chapter = idata["observed_data"]["weight"].to_numpy()
-        _sex_indicator_chapter = idata["constant_data"]["sex_cat"].to_numpy()
+        obs_weights = idata["observed_data"]["weight"].to_numpy()
+        sex_mask = idata["constant_data"]["sex_idx"].to_numpy()
+        weight_m = idata["observed_data"]["weight"].to_numpy()[sex_mask == 1]
+        weight_f = idata["observed_data"]["weight"].to_numpy()[sex_mask == 0]
 
         az.plot_dist(
-            _obs_weights_chapter[_sex_indicator_chapter == 0],
+            weight_f,
             color="C0",
             label="Female Obs",
         )
         az.plot_dist(
-            _obs_weights_chapter[_sex_indicator_chapter == 1],
+            weight_m,
             color="C1",
             label="Male Obs",
         )
@@ -351,6 +499,9 @@ def _(SEX, az, howell_adults, np, pl, plt, pm, rng):
         plt.xlabel("Weight (kg)")
         plt.legend()
 
+        ########################
+        # Mean Weight Contrast #
+        ########################
         plt.sca(axs[1, 0])
         az.plot_dist(
             idata["posterior"]["sex_diff"].to_numpy().ravel(),
@@ -361,20 +512,108 @@ def _(SEX, az, howell_adults, np, pl, plt, pm, rng):
         plt.xlabel("Mean Weight Contrast (kg)")
         plt.legend()
 
-        # Second row, Right: Remove the empty axis
-        fig.delaxes(axs[1, 1])
+        #####################################################################
+        # Proportion of hevier man (contrast for the posterior weight dist) #
+        #####################################################################
+        plt.sca(axs[1, 1])
+        # get the average for each chain, element-wise. If 4 chains with k draws, will return a 1D array with k elements.
+        avg_m_alpha = idata["posterior"]["alpha"].sel(sex="M").mean(dim=["chain"])
+        avg_f_alpha = idata["posterior"]["alpha"].sel(sex="F").mean(dim=["chain"])
+        avg_sigma = idata["posterior"]["sigma"].mean(dim="chain")
+        male_post_samples = rng.normal(
+            avg_m_alpha, avg_sigma
+        )  # k draws from the normal
+        female_post_samples = rng.normal(
+            avg_f_alpha, avg_sigma
+        )  # k draws from the normal
+        post_weight_contrast = male_post_samples - female_post_samples
+
+        post_weight_contrast_plot = az.plot_dist(
+            post_weight_contrast, color="black"
+        )
+
+        ##################################################
+        # Shade underneath posterior predictive contrast #
+        ##################################################
+        kde_x, kde_y = post_weight_contrast_plot.get_lines()[0].get_data()
+        n_draws = len(post_weight_contrast)
+
+        # Proportion of PPD contrast below zero
+        neg_idx = kde_x < 0
+        neg_prob = 100 * np.sum(post_weight_contrast < 0) / n_draws
+        plt.fill_between(
+            x=kde_x[neg_idx],
+            y1=np.zeros(sum(neg_idx)),
+            y2=kde_y[neg_idx],
+            color="C0",
+            alpha=0.5,
+            label=f"{neg_prob:1.0f}%",
+        )
+
+        # Proportion of PPD contrast above zero (inclusive)
+        pos_idx = kde_x >= 0
+        pos_prob = 100 * np.sum(post_weight_contrast >= 0) / n_draws
+        plt.fill_between(
+            x=kde_x[pos_idx],
+            y1=np.zeros(sum(pos_idx)),
+            y2=kde_y[pos_idx],
+            color="C1",
+            alpha=0.5,
+            label=f"{pos_prob:1.0f}%",
+        )
+
+        plt.xlabel("Posterior Weight Contrast (kg) [M - F]")
+        plt.legend()
 
         plt.tight_layout()
 
         return plt.gca()
 
-    return (
-        fit_total_effect_sex_weight,
-        howell_SW_testing,
-        plot_howell_HW_dist,
-        plot_post_dist_mean_and_weight_howell,
-        sim_synthetic_people,
-    )
+    return (plot_post_dist_mean_and_weight_howell,)
+
+
+@app.cell
+def _(SEX, az, howell_adults, pl, plt):
+    def plot_direct_sw_howell(
+        idata: az.InferenceData,
+        original_data: pl.DataFrame = howell_adults,
+    ) -> plt.Axes:
+        """
+        Plots the regression lines and original data points for the direct effect model.
+
+        Args:
+            idata: ArviZ InferenceData containing posterior and constant data.
+            original_data: The original Polars DataFrame to plot the scatter points from.
+
+        Returns:
+            The current matplotlib Axes object.
+        """
+        fig, ax = plt.subplots(figsize=(14, 6))
+
+        posterior = idata["posterior"]
+        obs_data = idata["observed_data"]
+        cte_data = idata["constant_data"]
+
+        for idx, s in enumerate(SEX):
+            plt.plot(
+                original_data["height"],
+                posterior["alpha"].sel(sex=s).mean()
+                + posterior["beta"].sel(sex=s).mean()
+                * (cte_data["height"] - cte_data["h_bar"]),
+                label=f"{s}",
+                c=f"C{idx}",
+            )
+            plt.scatter(
+                original_data.filter(pl.col("male") == idx)["height"],
+                original_data.filter(pl.col("male") == idx)["weight"],
+                c=f"C{idx}",
+                label=f"{s}",
+            )
+        plt.legend()
+
+        return plt.gca()
+
+    return (plot_direct_sw_howell,)
 
 
 @app.cell
@@ -386,7 +625,8 @@ def _(howell_adults, plot_howell_HW_dist):
 @app.cell
 def _(np, plot_howell_HW_dist, rng, sim_synthetic_people):
     synthetic_howell = sim_synthetic_people(
-        sex_arr=rng.binomial(n=1, p=0.5, size=300), betas=np.array([0.5, 0.6])
+        sex_arr=rng.binomial(n=1, p=0.5, size=300),
+        betas=np.array([0.5, 0.6]),
     )
 
     plot_howell_HW_dist(data=synthetic_howell)
@@ -396,7 +636,7 @@ def _(np, plot_howell_HW_dist, rng, sim_synthetic_people):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Total Effect of Sex on Weight
+    ## Total Effect of Sex on Weight
 
     Goal is to study the distribution of weight for different sex. The model is:
 
@@ -418,31 +658,31 @@ def _(mo):
 
 @app.cell
 def _(az, howell_SW_testing, np, plt):
-    sim_F, sim_M = howell_SW_testing(
+    sim_total_F, sim_total_M = howell_SW_testing(
         male_avg_height=160, female_avg_height=150, betas=np.array([0.5, 0.6])
     )
 
-    sim_delta = sim_M - sim_F
-    print(f"Mean difference is: {sim_delta['weight'].mean()}")
+    sim_total_delta = sim_total_M - sim_total_F
+    print(f"Mean difference is: {sim_total_delta['weight'].mean()}")
 
-    az.plot_dist(sim_F["weight"], color="C0", label="Female")
-    az.plot_dist(sim_M["weight"], color="C1", label="Male")
-    az.plot_dist(sim_delta["weight"], color="black", label="Difference")
+    az.plot_dist(sim_total_F["weight"], color="C0", label="Female")
+    az.plot_dist(sim_total_M["weight"], color="C1", label="Male")
+    az.plot_dist(sim_total_delta["weight"], color="black", label="Difference")
 
     plt.title("Distributions of Weight by Sex and Contrast")
     plt.xlabel("Weight (kg)")
     plt.gca()
-    return sim_F, sim_M
+    return
 
 
 @app.cell
-def _(fit_total_effect_sex_weight, pl, sim_F, sim_M):
-    howell_sim_idata = fit_total_effect_sex_weight(
-        data=pl.concat([sim_F, sim_M]), draws=100, prior=False
-    )
+def _():
+    # howell_sim_idata, howell_sim_model = fit_total_effect_sex_weight(
+    #     data=pl.concat([sim_F, sim_M]), draws=100, prior=False
+    # )
 
-    howell_sim_idata["posterior"]["sex_diff"].mean()
-    return (howell_sim_idata,)
+    # howell_sim_idata["posterior"]["sex_diff"].mean()
+    return
 
 
 @app.cell(hide_code=True)
@@ -454,8 +694,8 @@ def _(mo):
 
 
 @app.cell
-def _(howell_sim_idata, plot_post_dist_mean_and_weight_howell):
-    plot_post_dist_mean_and_weight_howell(howell_sim_idata)
+def _():
+    # plot_post_dist_mean_and_weight_howell(howell_sim_idata)
     return
 
 
@@ -483,8 +723,10 @@ def _(mo):
 
 @app.cell
 def _(fit_total_effect_sex_weight, howell_adults):
-    howell_idata = fit_total_effect_sex_weight(data=howell_adults, prior=False, draws=200)
-    return (howell_idata,)
+    howell_total_sw_idata, howell_total_sw_model = fit_total_effect_sex_weight(
+        data=howell_adults, prior=False, draws=1000
+    )
+    return (howell_total_sw_idata,)
 
 
 @app.cell(hide_code=True)
@@ -496,23 +738,52 @@ def _(mo):
 
 
 @app.cell
-def _(howell_idata, plot_post_dist_mean_and_weight_howell):
-    plot_post_dist_mean_and_weight_howell(howell_idata)
+def _(howell_total_sw_idata, plot_post_dist_mean_and_weight_howell):
+    plot_post_dist_mean_and_weight_howell(howell_total_sw_idata)
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Total  Direct Effect of Sex on Weight
+    ## Total  Direct Effect of Sex on Weight
 
     Goal is to study the distribution of weight for different sex. The model is:
 
-    $$W_i \sim \text{Normal}(\mu_i, \sigma)$$
-    $$\mu_i = \alpha_{S[i]}$$
-    $$\mu \sim \text{Normal}(60, 10)$$
-    $$\sigma \sim \text{Uniform}(0, 10)$$
+    $$ W_i \sim \text{Normal}(\mu_i, \sigma) $$
+    $$ \mu_i = \alpha_{S[i]} + \beta_{S[i]}*(h_i-\bar h) $$
+    $$ \mu_j \sim \text{Normal}(60, 10) $$
+    $$ \beta_j \sim \text{Uniform}(0, 1) $$
+    $$ \sigma \sim \text{Uniform}(0, 10) $$
     """)
+    return
+
+
+@app.cell
+def _(az, howell_SW_testing, np, plt):
+    sim_direct_F, sim_direct_M = howell_SW_testing(
+        male_avg_height=160,
+        female_avg_height=150,
+        alphas=np.array([0, 10]),
+        betas=np.array([0.5, 0.6]),
+    )
+
+    sim_direct_delta = sim_direct_M - sim_direct_F
+    print(f"Mean difference is: {sim_direct_delta['weight'].mean()}")
+
+    az.plot_dist(sim_direct_F["weight"], color="C0", label="Female")
+    az.plot_dist(sim_direct_M["weight"], color="C1", label="Male")
+    az.plot_dist(sim_direct_delta["weight"], color="black", label="Difference")
+
+    plt.title("Distributions of Weight by Sex and Contrast")
+    plt.xlabel("Weight (kg)")
+    plt.gca()
+    return sim_direct_F, sim_direct_M
+
+
+@app.cell
+def _(pl, plot_howell_HW_dist, sim_direct_F, sim_direct_M):
+    plot_howell_HW_dist(data=pl.concat([sim_direct_F, sim_direct_M]))
     return
 
 
@@ -521,7 +792,45 @@ def _():
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    #### Model Predictive Simulation
+    """)
+    return
+
+
 @app.cell
+def _(fit_direct_effect_sex_weight, howell_adults):
+    howell_direct_sw_idata, howell_direct_sw_model = fit_direct_effect_sex_weight(
+        data=howell_adults, prior=False, draws=1000
+    )
+    return (howell_direct_sw_idata,)
+
+
+@app.cell
+def _(howell_direct_sw_idata, plot_direct_sw_howell):
+    plot_direct_sw_howell(idata=howell_direct_sw_idata)
+    return
+
+
+@app.cell
+def _(howell_direct_sw_idata, plot_post_dist_mean_and_weight_howell):
+    plot_post_dist_mean_and_weight_howell(idata=howell_direct_sw_idata)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The above suggests that almost all of the causal effect of sex acts through height. Just sex does not change how likely it is to be heavier or lighter for this sample.
+
+    This might not be true in other populations, and it might also not be true for this same population at a different point in time!
+    """)
+    return
+
+
+@app.cell(hide_code=True)
 def _():
     return
 
