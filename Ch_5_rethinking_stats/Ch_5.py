@@ -20,7 +20,7 @@
 
 import marimo
 
-__generated_with = "0.21.1"
+__generated_with = "0.22.0"
 app = marimo.App(width="columns")
 
 
@@ -34,17 +34,24 @@ def _():
     import numpy as np
     import polars as pl
     import pymc as pm
-    import scipy.stats as stats
+    import scipy.stats as statszl
     from pathlib import Path
+    from wigglystuff import EdgeDraw
 
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
     plt.style.use("fivethirtyeight")
+    # Set default figure size to 10 inches wide by 6 inches tall
+    plt.rcParams["figure.figsize"] = (14, 5)
+    # You can also set the DPI (dots per inch) for crisper images
+    plt.rcParams["figure.dpi"] = 100
+    # Make the layout "tight" by default so labels don't overlap
+    plt.rcParams["figure.autolayout"] = True
 
     az.rcParams["stats.ci_prob"] = (
         0.89  # sets default credible interval used by arviz
     )
-    return Path, az, mo, np, operator, pl, plt, pm, rng
+    return EdgeDraw, Path, az, mo, np, operator, pl, plt, pm, rng
 
 
 @app.cell(hide_code=True)
@@ -62,13 +69,15 @@ def _(Path, pl):
     #############
     WAFFLE_PATH = Path(__file__).parent.parent / "data" / "WaffleDivorce.csv"
     HOWELL_PATH = Path(__file__).parent.parent / "data" / "Howell1.csv"
+    MILK_PATH = Path(__file__).parent.parent / "data" / "milk.csv"
 
     # women=0 and men=1 in the dataset
     SEX = ["F", "M"]
 
     raw_waffle_data = pl.read_csv(WAFFLE_PATH, separator=";")
     raw_howell_data = pl.read_csv(HOWELL_PATH, separator=";")
-    return SEX, raw_howell_data, raw_waffle_data
+    raw_milk_data = pl.read_csv(MILK_PATH, separator=";")
+    return SEX, raw_howell_data, raw_milk_data, raw_waffle_data
 
 
 @app.cell(hide_code=True)
@@ -87,14 +96,14 @@ def _(operator, pl):
         )
 
 
-    def std_cols_of_interest(dataf: pl.DataFrame) -> pl.DataFrame:
+    def std_cols_of_interest(dataf: pl.DataFrame, cols: list[str]) -> pl.DataFrame:
         # add standardised columns
         return dataf.with_columns(
             [
                 ((pl.col(col) - pl.col(col).mean()) / pl.col(col).std()).alias(
                     f"{col}_std"
                 )
-                for col in ["divorce", "medianAgeMarriage", "marriage"]
+                for col in cols
             ]
         )
 
@@ -115,7 +124,18 @@ def _(operator, pl):
         # Equivalent to: df.filter(pl.col(col_name) >= value)
         return df.filter(ops[op_str](pl.col(col_name), value))
 
-    return cols_to_lowercase, filter_by_comparison, std_cols_of_interest
+
+    def set_dtypes_float64(dataf: pl.DataFrame, cols: list[str]) -> pl.DataFrame:
+        return dataf.with_columns(
+            [pl.col(col).cast(pl.Float64, strict=False) for col in cols]
+        )
+
+    return (
+        cols_to_lowercase,
+        filter_by_comparison,
+        set_dtypes_float64,
+        std_cols_of_interest,
+    )
 
 
 @app.cell(hide_code=True)
@@ -131,82 +151,25 @@ def _(
     cols_to_lowercase,
     filter_by_comparison,
     raw_howell_data,
+    raw_milk_data,
     raw_waffle_data,
+    set_dtypes_float64,
     std_cols_of_interest,
 ):
     waffle_data = raw_waffle_data.pipe(cols_to_lowercase).pipe(
-        std_cols_of_interest
+        std_cols_of_interest, ["divorce", "medianAgeMarriage", "marriage"]
     )
 
     howell_adults = raw_howell_data.pipe(filter_by_comparison, "age", 18, ">=")
 
     howell_children = raw_howell_data.pipe(filter_by_comparison, "age", 13, "<=")
 
+    milk_data = raw_milk_data.pipe(
+        set_dtypes_float64, ["kcal.per.g", "mass", "neocortex.perc"]
+    ).pipe(std_cols_of_interest, ["kcal.per.g", "mass", "neocortex.perc"])
+
     # raw_howell_data, raw_waffle_data
     return howell_adults, waffle_data
-
-
-@app.cell
-def _(pl, plt, raw_howell_data):
-    def _() -> plt.Axes:
-        # 1. Create the boolean expression/mask
-        is_adult = pl.col("age") >= 18
-
-        # 2. Apply filtering
-        adult_howell = raw_howell_data.filter(is_adult)
-        child_howell = raw_howell_data.filter(~is_adult)
-
-        plt.scatter(
-            adult_howell["height"],
-            adult_howell["weight"],
-            label="over 18",
-        )
-        plt.scatter(
-            child_howell["height"],
-            child_howell["weight"],
-            label="under 18",
-        )
-
-        plt.xlabel("Height (cm)")
-        plt.ylabel("Weight (kg)")
-
-        plt.legend()
-
-        return plt.gca()
-
-
-    # _()
-    return
-
-
-@app.cell
-def _():
-    return
-
-
-@app.cell
-def _():
-    return
-
-
-@app.cell
-def _():
-    return
-
-
-@app.cell
-def _():
-    return
-
-
-@app.cell
-def _():
-    return
-
-
-@app.cell
-def _():
-    return
 
 
 @app.cell
@@ -383,7 +346,7 @@ def _(SEX, az, howell_adults, np, pl, pm, rng):
 
             return idata, sex_weight_model
 
-    return (fit_total_effect_sex_weight,)
+    return
 
 
 @app.cell
@@ -442,7 +405,7 @@ def _(SEX, az, howell_adults, np, pl, pm, rng):
 
             return idata, direct_sex_weight_model
 
-    return (fit_direct_effect_sex_weight,)
+    return
 
 
 @app.cell
@@ -722,11 +685,11 @@ def _(mo):
 
 
 @app.cell
-def _(fit_total_effect_sex_weight, howell_adults):
-    howell_total_sw_idata, howell_total_sw_model = fit_total_effect_sex_weight(
-        data=howell_adults, prior=False, draws=1000
-    )
-    return (howell_total_sw_idata,)
+def _():
+    # howell_total_sw_idata, howell_total_sw_model = fit_total_effect_sex_weight(
+    #     data=howell_adults, prior=False, draws=1000
+    # )
+    return
 
 
 @app.cell(hide_code=True)
@@ -787,11 +750,6 @@ def _(pl, plot_howell_HW_dist, sim_direct_F, sim_direct_M):
     return
 
 
-@app.cell
-def _():
-    return
-
-
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -801,11 +759,11 @@ def _(mo):
 
 
 @app.cell
-def _(fit_direct_effect_sex_weight, howell_adults):
-    howell_direct_sw_idata, howell_direct_sw_model = fit_direct_effect_sex_weight(
-        data=howell_adults, prior=False, draws=1000
-    )
-    return (howell_direct_sw_idata,)
+def _():
+    # howell_direct_sw_idata, howell_direct_sw_model = fit_direct_effect_sex_weight(
+    #     data=howell_adults, prior=False, draws=1000
+    # )
+    return
 
 
 @app.cell
@@ -838,62 +796,232 @@ def _():
 @app.cell(column=2, hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Chapter Notes
+    # Chapter Notes
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Helper Functions
     """)
     return
 
 
 @app.cell
 def _(plt, waffle_data):
-    _, _ax = plt.subplots(1, 2, figsize=(14, 5))
+    def plot_divorce_marriage_age() -> plt.Axes:
+        _, _ax = plt.subplots(1, 2)
 
-    _ax[0].scatter(waffle_data["marriage"], waffle_data["divorce"])
-    _ax[0].set_xlabel("Marriage Rate")
-    _ax[0].set_ylabel("Divorce Rate")
-    _ax[0].set_title("Divorce vs Marriage Rate")
+        _ax[0].scatter(waffle_data["marriage"], waffle_data["divorce"])
+        _ax[0].set_xlabel("Marriage Rate")
+        _ax[0].set_ylabel("Divorce Rate")
+        _ax[0].set_title("Divorce vs Marriage Rate")
 
-    _ax[1].scatter(waffle_data["medianAgeMarriage"], waffle_data["divorce"])
-    _ax[1].set_xlabel("Median Age Marriage")
-    _ax[1].set_ylabel("Divorce Rate")
-    _ax[1].set_title("Marriage vs Median Age of Marriage")
+        _ax[1].scatter(waffle_data["medianAgeMarriage"], waffle_data["divorce"])
+        _ax[1].set_xlabel("Median Age Marriage")
+        _ax[1].set_ylabel("Divorce Rate")
+        _ax[1].set_title("Marriage vs Median Age of Marriage")
+
+        return plt.gca()
+
+    return (plot_divorce_marriage_age,)
+
+
+@app.cell
+def _(az, np, pm, rng):
+    def run_linear_model(
+        predictors: list[np.array],
+        predictors_names: list[str],
+        outcome: np.array,
+        outcome_name: str,
+        prior_predictive: bool = False,
+        draws: int = 100,
+    ) -> az.InferenceData:
+        """
+        Fits a Bayesian linear regression model using PyMC.
+
+        Args:
+            predictors: A list of numpy arrays, each representing a predictor variable.
+            predictors_names: A list of strings containing the names of the predictors.
+            outcome: A numpy array containing the outcome variable.
+            outcome_name: A string name for the outcome variable (used in the model).
+            prior_predictive: If True, samples from the prior predictive distribution instead of the posterior.
+            draws: Number of samples to draw.
+
+        Returns:
+            An ArViz InferenceData object containing the model samples.
+        """
+        coords = {
+            "predictors": predictors_names,
+            "obs_id": np.arange(len(outcome)),
+        }
+        # Make every column of the predictors list of arrays a predictor.
+        # Done so that the dot product ccan work. Every predictor multiply one beta.
+        predictors = np.vstack([*predictors]).T
+
+        with pm.Model(coords=coords) as model:
+            # Data
+            x_data = pm.Data("x_data", predictors, dims=("obs_id", "predictors"))
+
+            # Priors
+            alpha = pm.Normal("alpha", 0, 0.2)
+            beta = pm.Normal("beta", mu=0, sigma=0.5, dims="predictors")
+            sigma = pm.Exponential("sigma", lam=1)
+
+            # Linear Model: mu = alpha + X * beta
+            # PyMC handles the matrix multiplication perfectly here
+            mu = alpha + pm.math.dot(x_data, beta)
+
+            # Likelihood
+            obs = pm.Normal(
+                outcome_name, mu=mu, sigma=sigma, observed=outcome, dims="obs_id"
+            )
+            if prior_predictive:
+                idata = pm.sample_prior_predictive(draws=draws, random_seed=rng)
+            else:
+                idata = pm.sample(draws=draws, random_seed=rng)
+
+        return idata
+
+    return (run_linear_model,)
+
+
+@app.cell
+def _(az, np, plt, waffle_data):
+    def plot_simple_regression_on_original_scale(
+        idata, predictor_col, outcome_col="divorce", data=waffle_data
+    ):
+        """
+        Plots the MAP regression line and 89% HDI for a given model,
+        transforming standardized predictions back to the original scale.
+
+        Args:
+            idata: ArViz InferenceData object containing posterior samples.
+            predictor_col: The string name of the original scale predictor column (e.g., 'medianAgeMarriage').
+            outcome_col: The string name of the original scale outcome column. Defaults to 'divorce'.
+            data: Polars or Pandas DataFrame containing the raw data.
+        """
+        _a_samples = idata["posterior"]["alpha"].to_numpy().flatten()
+        _b_samples = idata["posterior"]["beta"].to_numpy().flatten()
+
+        _raw_x = data[predictor_col].to_numpy()
+        _std_x = data[f"{predictor_col}_std"].to_numpy()
+        _raw_y = data[outcome_col].to_numpy()
+
+        # Scaling parameters
+        _y_mean = data[outcome_col].mean()
+        _y_std = data[outcome_col].std()
+
+        # Raw data
+        plt.scatter(
+            _raw_x,
+            _raw_y,
+            c="red",
+            alpha=0.6,
+            label=f"raw_{outcome_col}_data",
+        )
+
+        # MAP - convert back to original scale
+        # Result: (n_points,)
+        _map_line_std = _a_samples.mean() + _b_samples.mean() * _std_x
+        _map_line = _map_line_std * _y_std + _y_mean
+
+        # Sort for plotting lines properly
+        _sort_idx = np.argsort(_raw_x)
+        plt.plot(
+            _raw_x[_sort_idx],
+            _map_line[_sort_idx],
+            c="green",
+            lw=3,
+            label="MAP regression line",
+        )
+
+        # Calculate mu for each posterior sample in original scale
+        # Broadcasting: (n_samples, 1) + (n_samples, 1) * (n_points,)
+        _mu_std = _a_samples[:, np.newaxis] + _b_samples[:, np.newaxis] * _std_x
+        _mu = _mu_std * _y_std + _y_mean
+
+        # 89% HDI mean
+        _mu_hdi = az.hdi(_mu, hdi_prob=0.89)
+        az.plot_hdi(
+            x=_raw_x,
+            hdi_data=_mu_hdi,
+            color="green",
+        )
+
+        plt.xlabel(predictor_col)
+        plt.ylabel(outcome_col)
+        plt.title(f"Regression of {outcome_col} on {predictor_col}")
+        plt.legend()
+        return plt.gca()
+
+    return (plot_simple_regression_on_original_scale,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Section 5.1
+    """)
     return
 
 
 @app.cell
-def _(np, pm, waffle_data):
-    def m5_1(draws: int = 50):
-        with pm.Model() as m5_1:
-            a = pm.Normal("a", 0, 0.2)
-            bA = pm.Normal("bA", 0, 0.5)
-            sigma = pm.Exponential("sigma", 1)
-            mu = a + bA * waffle_data.get_column("medianAgeMarriage_std").to_numpy()
-
-            div_rate = pm.Normal(
-                "divorce_rate",
-                mu=mu,
-                sigma=sigma,
-                observed=waffle_data["divorce_std"].to_numpy(),
-            )
-
-            prior_samples = pm.sample_prior_predictive(draws)
-
-            idata = pm.sample(draws)
-
-        x = np.linspace(
-            waffle_data["medianAgeMarriage_std"].min(),
-            waffle_data["medianAgeMarriage_std"].max(),
-        )
-
-        return prior_samples, idata, x
+def _(waffle_data):
+    WAFFLE_OUTCOME = waffle_data["divorce_std"].to_numpy()
+    return (WAFFLE_OUTCOME,)
 
 
-    # m5_1_prior, m5_1_idata, m5_1_x = m5_1(draws=50)
+@app.cell
+def _(plot_divorce_marriage_age):
+    plot_divorce_marriage_age()
+    return
 
-    # a_plot = m5_1_prior["prior"]["a"].to_numpy().flatten()
-    # bA_plot = m5_1_prior["prior"]["bA"].to_numpy().flatten()
-    # mu_plot = a_plot[:, None] + bA_plot[:, None] * m5_1_x
 
-    # plt.plot(m5_1_x, mu_plot.T, c="g", alpha=0.4)
+@app.cell(hide_code=True)
+def _(EdgeDraw, mo):
+    divorce_age_model_latex = mo.md(r"""
+                        \begin{align*}
+                        D_i &\sim \mathcal{N}(\mu_i, \sigma)\\
+                        \mu_i &= \alpha + \beta_A A_i\\
+                        \alpha &\sim \mathcal{N}(0,\,0.2)\\
+                        \beta_A &\sim \mathcal{N}(0,\,0.5)\\
+                        \sigma &\sim \text{Exponential}(1)
+                        \end{align*}
+                        """)
+    divorce_age_graph = EdgeDraw(names=["D", "A"], directed=True)
+
+    mo.hstack(
+        [
+            mo.vstack([mo.md(" "), divorce_age_model_latex], justify="center"),
+            divorce_age_graph,
+        ],
+    )
+    return
+
+
+@app.cell
+def _(WAFFLE_OUTCOME, np, plt, run_linear_model, waffle_data):
+    m5_1_prior = run_linear_model(
+        predictors=[waffle_data["medianAgeMarriage_std"].to_numpy()],
+        predictors_names=["median_age_std"],
+        outcome=WAFFLE_OUTCOME,
+        outcome_name="Divorce_std",
+        prior_predictive=True,
+    )
+
+    m5_1_x = np.linspace(
+        waffle_data["medianAgeMarriage_std"].min(),
+        waffle_data["medianAgeMarriage_std"].max(),
+    )
+
+    alpha_plot = m5_1_prior["prior"]["alpha"].to_numpy().flatten()
+    beta_plot = m5_1_prior["prior"]["beta"].to_numpy().flatten()
+    mu_plot = alpha_plot[:, None] + beta_plot[:, None] * m5_1_x
+
+    plt.plot(m5_1_x, mu_plot.T, c="g", alpha=0.4)
     return
 
 
@@ -904,66 +1032,141 @@ def _(waffle_data):
 
 
 @app.cell
-def _(az, m5_1_idata, np, plt, waffle_data):
-    _a_samples = (
-        m5_1_idata["posterior"]["a"].to_numpy().flatten()
-    )  # shape is (4 * n_samples,)
-    _bA_samples = (
-        m5_1_idata["posterior"]["bA"].to_numpy().flatten()
-    )  # shape is (4 * n_samples,)
-    _x = np.linspace(
-        waffle_data["medianAgeMarriage_std"].min(),
-        waffle_data["medianAgeMarriage_std"].max(),
-        waffle_data.shape[0],
+def _(WAFFLE_OUTCOME, run_linear_model, waffle_data):
+    m5_1_idata = run_linear_model(
+        predictors=[waffle_data["medianAgeMarriage_std"].to_numpy()],
+        predictors_names=["median_age_std"],
+        outcome=WAFFLE_OUTCOME,
+        outcome_name="Divorce_std",
+        prior_predictive=False,
+        draws=1000,
     )
+    return (m5_1_idata,)
 
-    # Raw data
-    plt.scatter(
-        waffle_data["medianAgeMarriage"], waffle_data["divorce"], c="red", label="waffle_data"
-    )
 
-    # MAP - convert back to original scale
-    _divorce_mean = waffle_data["divorce"].mean()
-    _divorce_std = waffle_data["divorce"].std()
-
-    _map_line = (
-        _a_samples.mean()
-        + _bA_samples.mean() * waffle_data["medianAgeMarriage_std"].to_numpy()
-    ) * _divorce_std + _divorce_mean
-
-    plt.plot(
-        waffle_data["medianAgeMarriage"],
-        _map_line,
-        c="green",
-        lw=3,
-        label="MAP regression line",
-    )
-
-    # 2. Manually calculate mu for each posterior sample in original scale
-    # Broadcasting: (n_samples, 1) + (n_samples, 1) * (n_points,)
-    # Result: (n_samples, n_points)
-    _mu_std = (
-        _a_samples[:, np.newaxis]
-        + _bA_samples[:, np.newaxis] * waffle_data["medianAgeMarriage_std"].to_numpy()
-    )
-    _mu = _mu_std * _divorce_std + _divorce_mean
-
-    # 89% HDI mean
-    _mu_hdi = az.hdi(_mu, hdi_prob=0.89)
-    az.plot_hdi(
-        x=waffle_data["medianAgeMarriage"].to_numpy(), hdi_data=_mu_hdi, color="green"
-    )
-
-    plt.xlabel("MedianAgeMarriage")
-    plt.ylabel("Divorce")
-    plt.legend()
-    plt.gca()
+@app.cell
+def _(m5_1_idata, plot_simple_regression_on_original_scale):
+    plot_simple_regression_on_original_scale(m5_1_idata, "medianAgeMarriage")
     return
 
 
 @app.cell
 def _(az, m5_1_idata):
-    az.summary(m5_1_idata)
+    az.summary(m5_1_idata, kind="stats")
+    return
+
+
+@app.cell(hide_code=True)
+def _(EdgeDraw, mo):
+    divorce_marriage_model_latex = mo.md(r"""
+                        \begin{align*}
+                        D_i &\sim \mathcal{N}(\mu_i, \sigma)\\
+                        \mu_i &= \alpha + \beta_M M_i\\
+                        \alpha &\sim \mathcal{N}(0,\,0.2)\\
+                        \beta_A &\sim \mathcal{N}(0,\,0.5)\\
+                        \sigma &\sim \text{Exponential}(1)
+                        \end{align*}
+                        """)
+    divorce_marriage_graph = EdgeDraw(names=["Divorce", "Marriage"], directed=True)
+
+    mo.hstack(
+        [
+            mo.vstack(
+                [mo.md(" "), divorce_marriage_model_latex], justify="center"
+            ),
+            divorce_marriage_graph,
+        ],
+    )
+    return
+
+
+@app.cell
+def _(WAFFLE_OUTCOME, run_linear_model, waffle_data):
+    m5_2_idata = run_linear_model(
+        predictors=[waffle_data["marriage_std"].to_numpy()],
+        predictors_names=["marriage_std"],
+        outcome=WAFFLE_OUTCOME,
+        outcome_name="Divorce_std",
+        prior_predictive=False,
+        draws=1000,
+    )
+    return (m5_2_idata,)
+
+
+@app.cell
+def _(m5_2_idata, plot_simple_regression_on_original_scale):
+    plot_simple_regression_on_original_scale(m5_2_idata, "marriage")
+    return
+
+
+@app.cell
+def _(az, m5_2_idata):
+    az.summary(m5_2_idata, kind="stats")
+    return
+
+
+@app.cell(hide_code=True)
+def _(EdgeDraw):
+    divorce_age_marriage_graph = EdgeDraw(
+        names=["Divorce", "Age", "Marriage"], directed=True
+    )
+    divorce_age_marriage_graph
+    return
+
+
+@app.cell
+def _(WAFFLE_OUTCOME, run_linear_model, waffle_data):
+    m5_3_idata = run_linear_model(
+        predictors=[
+            waffle_data["marriage_std"].to_numpy(),
+            waffle_data["medianAgeMarriage_std"].to_numpy(),
+        ],
+        predictors_names=["marriage_std", "median_age_marriage_std"],
+        outcome=WAFFLE_OUTCOME,
+        outcome_name="Divorce_std",
+        prior_predictive=False,
+        draws=1000,
+    )
+    return (m5_3_idata,)
+
+
+@app.cell
+def _(az, m5_3_idata):
+    az.summary(m5_3_idata, kind="stats")
+    return
+
+
+@app.cell
+def _(az, m5_1_idata, m5_2_idata, m5_3_idata):
+    az.plot_forest(
+        [
+            m5_3_idata,
+            m5_2_idata,
+            m5_1_idata,
+        ],
+        model_names=["both", "marriage", "age"],
+        var_names=["beta"],
+        combined=True,
+        figsize=(10, 5),
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Section 5.2
+    """)
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell
+def _():
     return
 
 
