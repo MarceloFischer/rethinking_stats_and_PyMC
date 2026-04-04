@@ -903,21 +903,21 @@ def _(az, np, plt, waffle_data):
             outcome_col: The string name of the original scale outcome column. Defaults to 'divorce'.
             data: Polars or Pandas DataFrame containing the raw data.
         """
-        _a_samples = idata["posterior"]["alpha"].to_numpy().flatten()
-        _b_samples = idata["posterior"]["beta"].to_numpy().flatten()
+        alpha_samples = idata["posterior"]["alpha"].to_numpy().flatten()
+        beta_samples = idata["posterior"]["beta"].to_numpy().flatten()
 
-        _raw_x = data[predictor_col].to_numpy()
-        _std_x = data[f"{predictor_col}_std"].to_numpy()
-        _raw_y = data[outcome_col].to_numpy()
+        raw_x = data[predictor_col].to_numpy()
+        std_x = data[f"{predictor_col}_std"].to_numpy()
+        raw_y = data[outcome_col].to_numpy()
 
         # Scaling parameters
-        _y_mean = data[outcome_col].mean()
-        _y_std = data[outcome_col].std()
+        y_mean = data[outcome_col].mean()
+        y_std = data[outcome_col].std()
 
         # Raw data
         plt.scatter(
-            _raw_x,
-            _raw_y,
+            raw_x,
+            raw_y,
             c="red",
             alpha=0.6,
             label=f"raw_{outcome_col}_data",
@@ -925,14 +925,14 @@ def _(az, np, plt, waffle_data):
 
         # MAP - convert back to original scale
         # Result: (n_points,)
-        _map_line_std = _a_samples.mean() + _b_samples.mean() * _std_x
-        _map_line = _map_line_std * _y_std + _y_mean
+        map_line_std = alpha_samples.mean() + beta_samples.mean() * std_x
+        map_line = map_line_std * y_std + y_mean
 
         # Sort for plotting lines properly
-        _sort_idx = np.argsort(_raw_x)
+        sort_idx = np.argsort(raw_x)
         plt.plot(
-            _raw_x[_sort_idx],
-            _map_line[_sort_idx],
+            raw_x[sort_idx],
+            map_line[sort_idx],
             c="green",
             lw=3,
             label="MAP regression line",
@@ -940,14 +940,14 @@ def _(az, np, plt, waffle_data):
 
         # Calculate mu for each posterior sample in original scale
         # Broadcasting: (n_samples, 1) + (n_samples, 1) * (n_points,)
-        _mu_std = _a_samples[:, np.newaxis] + _b_samples[:, np.newaxis] * _std_x
-        _mu = _mu_std * _y_std + _y_mean
+        mu_std = alpha_samples[:, np.newaxis] + beta_samples[:, np.newaxis] * std_x
+        mu = mu_std * y_std + y_mean
 
         # 89% HDI mean
-        _mu_hdi = az.hdi(_mu, hdi_prob=0.89)
+        mu_hdi = az.hdi(mu, hdi_prob=0.89)
         az.plot_hdi(
-            x=_raw_x,
-            hdi_data=_mu_hdi,
+            x=raw_x,
+            hdi_data=mu_hdi,
             color="green",
         )
 
@@ -1149,6 +1149,18 @@ def _(az, m5_1_idata, m5_2_idata, m5_3_idata):
         combined=True,
         figsize=(10, 5),
     )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The above shows that after we know the median_age_at_marriage, there is little or no new information in also knowing the marriage_rate. This implies that all of marriage_rate influences divorce_rate via age.
+
+    "Once we know median_age_at_marriage for a State, there is little or no additional predictive power in also knowing the rate_of_marriage in that State."
+
+    Therefore there is no, or almost no, direct causal path from marriage_rate to divorce_rate.
+    """)
     return
 
 
