@@ -28,9 +28,11 @@ app = marimo.App(width="columns")
 def _():
     import operator
     import altair as alt
+    from typing import Optional
     import arviz as az
     import marimo as mo
     import matplotlib.pyplot as plt
+    import seaborn as sns
     import numpy as np
     import polars as pl
     import pymc as pm
@@ -48,10 +50,8 @@ def _():
     # Make the layout "tight" by default so labels don't overlap
     plt.rcParams["figure.autolayout"] = True
 
-    az.rcParams["stats.ci_prob"] = (
-        0.89  # sets default credible interval used by arviz
-    )
-    return EdgeDraw, Path, az, mo, np, operator, pl, plt, pm, rng
+    az.rcParams["stats.ci_prob"] = 0.89  # sets default credible interval used by arviz
+    return EdgeDraw, Path, az, mo, np, operator, pl, plt, pm, rng, sns
 
 
 @app.cell(hide_code=True)
@@ -91,21 +91,28 @@ def _(mo):
 @app.cell
 def _(operator, pl):
     def cols_to_lowercase(dataf: pl.DataFrame) -> pl.DataFrame:
-        return dataf.rename(
-            {col: col[0].lower() + col[1:] for col in dataf.columns}
-        )
+        return dataf.rename({col: col[0].lower() + col[1:] for col in dataf.columns})
 
 
     def std_cols_of_interest(dataf: pl.DataFrame, cols: list[str]) -> pl.DataFrame:
         # add standardised columns
         return dataf.with_columns(
             [
-                ((pl.col(col) - pl.col(col).mean()) / pl.col(col).std()).alias(
-                    f"{col}_std"
-                )
+                ((pl.col(col) - pl.col(col).mean()) / pl.col(col).std()).alias(f"{col}_std")
                 for col in cols
             ]
         )
+
+
+    # fmt: off
+    def std_log_mass(dataf: pl.DataFrame) -> pl.DataFrame:
+        # add standardised columns
+        return (
+            dataf
+                .with_columns(log_mass=pl.col("mass").log())
+                .with_columns(log_mass_std=(pl.col("log_mass") - pl.col("log_mass").mean()) / pl.col("log_mass").std())
+    )
+    # fmt: on
 
 
     def filter_by_comparison(
@@ -126,15 +133,14 @@ def _(operator, pl):
 
 
     def set_dtypes_float64(dataf: pl.DataFrame, cols: list[str]) -> pl.DataFrame:
-        return dataf.with_columns(
-            [pl.col(col).cast(pl.Float64, strict=False) for col in cols]
-        )
+        return dataf.with_columns([pl.col(col).cast(pl.Float64, strict=False) for col in cols])
 
     return (
         cols_to_lowercase,
         filter_by_comparison,
         set_dtypes_float64,
         std_cols_of_interest,
+        std_log_mass,
     )
 
 
@@ -155,21 +161,33 @@ def _(
     raw_waffle_data,
     set_dtypes_float64,
     std_cols_of_interest,
+    std_log_mass,
 ):
-    waffle_data = raw_waffle_data.pipe(cols_to_lowercase).pipe(
-        std_cols_of_interest, ["divorce", "medianAgeMarriage", "marriage"]
+    # fmt: off
+    waffle_data = (
+        raw_waffle_data
+        .pipe(cols_to_lowercase)
+        .pipe(std_cols_of_interest, ["divorce", "medianAgeMarriage", "marriage"])
     )
 
-    howell_adults = raw_howell_data.pipe(filter_by_comparison, "age", 18, ">=")
+    howell_adults = (
+        raw_howell_data
+        .pipe(filter_by_comparison, "age", 18, ">=")
+    )
 
-    howell_children = raw_howell_data.pipe(filter_by_comparison, "age", 13, "<=")
+    howell_children = (
+        raw_howell_data
+        .pipe(filter_by_comparison, "age", 13, "<=")
+    )
 
-    milk_data = raw_milk_data.pipe(
-        set_dtypes_float64, ["kcal.per.g", "mass", "neocortex.perc"]
-    ).pipe(std_cols_of_interest, ["kcal.per.g", "mass", "neocortex.perc"])
-
-    # raw_howell_data, raw_waffle_data
-    return howell_adults, waffle_data
+    milk_data = (
+        raw_milk_data
+        .pipe(set_dtypes_float64, ["kcal.per.g", "neocortex.perc"])
+        .pipe(std_cols_of_interest, ["kcal.per.g", "neocortex.perc"])
+        .pipe(std_log_mass)
+    )
+    # fmt: on
+    return howell_adults, milk_data, waffle_data
 
 
 @app.cell
@@ -259,9 +277,7 @@ def _(np, pl, rng):
             A polars DataFrame containing simulated weight, height, and male indicator.
         """
         n_samples = len(sex_arr)
-        h = np.where(sex_arr, male_avg_height, female_avg_height) + rng.normal(
-            0, 5, n_samples
-        )
+        h = np.where(sex_arr, male_avg_height, female_avg_height) + rng.normal(0, 5, n_samples)
         w = alphas[sex_arr] + betas[sex_arr] * h + rng.normal(0, 5, n_samples)
 
         return pl.DataFrame({"weight": w, "height": h, "male": sex_arr})
@@ -271,9 +287,7 @@ def _(np, pl, rng):
 
 @app.cell
 def _(pl, rng, sim_synthetic_people):
-    def howell_SW_testing(
-        n_samples: int = 200, **kwargs
-    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+    def howell_SW_testing(n_samples: int = 200, **kwargs) -> tuple[pl.DataFrame, pl.DataFrame]:
         """
         Simulates balanced synthetic datasets for females and males for testing.
 
@@ -339,9 +353,7 @@ def _(SEX, az, howell_adults, np, pl, pm, rng):
                 weight = pm.Normal("weight", mu=mu, sigma=sigma)
                 idata = pm.sample_prior_predictive(draws, random_seed=rng)
             else:
-                weight = pm.Normal(
-                    "weight", mu=mu, sigma=sigma, observed=data["weight"]
-                )
+                weight = pm.Normal("weight", mu=mu, sigma=sigma, observed=data["weight"])
                 idata = pm.sample(draws, random_seed=rng)
 
             return idata, sex_weight_model
@@ -483,17 +495,11 @@ def _(SEX, az, np, plt, rng):
         avg_m_alpha = idata["posterior"]["alpha"].sel(sex="M").mean(dim=["chain"])
         avg_f_alpha = idata["posterior"]["alpha"].sel(sex="F").mean(dim=["chain"])
         avg_sigma = idata["posterior"]["sigma"].mean(dim="chain")
-        male_post_samples = rng.normal(
-            avg_m_alpha, avg_sigma
-        )  # k draws from the normal
-        female_post_samples = rng.normal(
-            avg_f_alpha, avg_sigma
-        )  # k draws from the normal
+        male_post_samples = rng.normal(avg_m_alpha, avg_sigma)  # k draws from the normal
+        female_post_samples = rng.normal(avg_f_alpha, avg_sigma)  # k draws from the normal
         post_weight_contrast = male_post_samples - female_post_samples
 
-        post_weight_contrast_plot = az.plot_dist(
-            post_weight_contrast, color="black"
-        )
+        post_weight_contrast_plot = az.plot_dist(post_weight_contrast, color="black")
 
         ##################################################
         # Shade underneath posterior predictive contrast #
@@ -561,8 +567,7 @@ def _(SEX, az, howell_adults, pl, plt):
             plt.plot(
                 original_data["height"],
                 posterior["alpha"].sel(sex=s).mean()
-                + posterior["beta"].sel(sex=s).mean()
-                * (cte_data["height"] - cte_data["h_bar"]),
+                + posterior["beta"].sel(sex=s).mean() * (cte_data["height"] - cte_data["h_bar"]),
                 label=f"{s}",
                 c=f"C{idx}",
             )
@@ -838,6 +843,8 @@ def _(az, np, pm, rng):
         outcome_name: str,
         prior_predictive: bool = False,
         draws: int = 100,
+        alpha_sigma: float = 0.2,
+        beta_sigma: float = 0.5,
     ) -> az.InferenceData:
         """
         Fits a Bayesian linear regression model using PyMC.
@@ -849,6 +856,8 @@ def _(az, np, pm, rng):
             outcome_name: A string name for the outcome variable (used in the model).
             prior_predictive: If True, samples from the prior predictive distribution instead of the posterior.
             draws: Number of samples to draw.
+            alpha_sigma: Standard deviation for the intercept prior.
+            beta_sigma: Standard deviation for the predictor coefficients prior.
 
         Returns:
             An ArViz InferenceData object containing the model samples.
@@ -866,8 +875,8 @@ def _(az, np, pm, rng):
             x_data = pm.Data("x_data", predictors, dims=("obs_id", "predictors"))
 
             # Priors
-            alpha = pm.Normal("alpha", 0, 0.2)
-            beta = pm.Normal("beta", mu=0, sigma=0.5, dims="predictors")
+            alpha = pm.Normal("alpha", 0, alpha_sigma)
+            beta = pm.Normal("beta", mu=0, sigma=beta_sigma, dims="predictors")
             sigma = pm.Exponential("sigma", lam=1)
 
             # Linear Model: mu = alpha + X * beta
@@ -876,7 +885,11 @@ def _(az, np, pm, rng):
 
             # Likelihood
             obs = pm.Normal(
-                outcome_name, mu=mu, sigma=sigma, observed=outcome, dims="obs_id"
+                outcome_name,
+                mu=mu,
+                sigma=sigma,
+                observed=outcome,
+                dims="obs_id",
             )
             if prior_predictive:
                 idata = pm.sample_prior_predictive(draws=draws, random_seed=rng)
@@ -890,74 +903,124 @@ def _(az, np, pm, rng):
 
 @app.cell
 def _(az, np, plt, waffle_data):
-    def plot_simple_regression_on_original_scale(
-        idata, predictor_col, outcome_col="divorce", data=waffle_data
+    def plot_simple_regression_on_chosen_scale(
+        idata,
+        predictor_col,
+        outcome_col="divorce",
+        data=waffle_data,
+        use_std=False,
     ):
         """
-        Plots the MAP regression line and 89% HDI for a given model,
-        transforming standardized predictions back to the original scale.
+        Plots the MAP regression line and 89% HDI for a given model.
+        Optionally transforms standardized predictions back to the original scale.
 
         Args:
             idata: ArViz InferenceData object containing posterior samples.
             predictor_col: The string name of the original scale predictor column (e.g., 'medianAgeMarriage').
             outcome_col: The string name of the original scale outcome column. Defaults to 'divorce'.
             data: Polars or Pandas DataFrame containing the raw data.
+            use_std: If True, plots on the standardized scale. If False, plots on the original scale.
         """
         alpha_samples = idata["posterior"]["alpha"].to_numpy().flatten()
         beta_samples = idata["posterior"]["beta"].to_numpy().flatten()
 
-        raw_x = data[predictor_col].to_numpy()
         std_x = data[f"{predictor_col}_std"].to_numpy()
+        std_y = data[f"{outcome_col}_std"].to_numpy()
+
+        raw_x = data[predictor_col].to_numpy()
         raw_y = data[outcome_col].to_numpy()
 
-        # Scaling parameters
+        # Determine which scale to use for plotting
+        plot_x = std_x if use_std else raw_x
+        plot_y = std_y if use_std else raw_y
+        x_label = f"{predictor_col}_std" if use_std else predictor_col
+        y_label = f"{outcome_col}_std" if use_std else outcome_col
+
+        # Scaling parameters for the outcome
         y_mean = data[outcome_col].mean()
         y_std = data[outcome_col].std()
 
-        # Raw data
+        # Raw data points
         plt.scatter(
-            raw_x,
-            raw_y,
+            plot_x,
+            plot_y,
             c="red",
+            s=50,
             alpha=0.6,
-            label=f"raw_{outcome_col}_data",
+            label=f"raw {outcome_col} data",
         )
 
-        # MAP - convert back to original scale
-        # Result: (n_points,)
+        # MAP calculation in standardized scale first
         map_line_std = alpha_samples.mean() + beta_samples.mean() * std_x
-        map_line = map_line_std * y_std + y_mean
+
+        # Calculate mu for each posterior sample in standardized scale
+        # Broadcasting: (n_samples, 1) + (n_samples, 1) * (n_points,)
+        mu_std = alpha_samples[:, np.newaxis] + beta_samples[:, np.newaxis] * std_x
+
+        if use_std:
+            map_line = map_line_std
+            mu = mu_std
+        else:
+            # Transform back to original scale
+            map_line = map_line_std * y_std + y_mean
+            mu = mu_std * y_std + y_mean
 
         # Sort for plotting lines properly
-        sort_idx = np.argsort(raw_x)
+        sort_idx = np.argsort(plot_x)
         plt.plot(
-            raw_x[sort_idx],
+            plot_x[sort_idx],
             map_line[sort_idx],
             c="green",
             lw=3,
             label="MAP regression line",
         )
 
-        # Calculate mu for each posterior sample in original scale
-        # Broadcasting: (n_samples, 1) + (n_samples, 1) * (n_points,)
-        mu_std = alpha_samples[:, np.newaxis] + beta_samples[:, np.newaxis] * std_x
-        mu = mu_std * y_std + y_mean
-
-        # 89% HDI mean
+        # 89% HDI
         mu_hdi = az.hdi(mu, hdi_prob=0.89)
         az.plot_hdi(
-            x=raw_x,
+            x=plot_x,
             hdi_data=mu_hdi,
             color="green",
         )
 
-        plt.xlabel(predictor_col)
-        plt.ylabel(outcome_col)
-        plt.title(f"Regression of {outcome_col} on {predictor_col}")
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
+        plt.title(
+            f"Regression of {outcome_col} on {predictor_col} ({'Standardized' if use_std else 'Original'} Scale)"
+        )
         plt.legend()
         return plt.gca()
 
-    return (plot_simple_regression_on_original_scale,)
+    return (plot_simple_regression_on_chosen_scale,)
+
+
+@app.cell
+def _(az, np, pl, plt):
+    def plot_linear_regression_prior_predictive(
+        idata: az.InferenceData,
+        predictor_col: str,
+        outcome_col: str,
+        data: pl.DataFrame,
+    ) -> plt.Axes:
+        x_vals = np.linspace(-2, 2)
+
+        alpha_plot = idata["prior"]["alpha"].to_numpy().flatten()
+        beta_plot = idata["prior"]["beta"].to_numpy().flatten()
+        mu_plot = alpha_plot[:, None] + beta_plot[:, None] * x_vals
+
+        plt.plot(x_vals, mu_plot.T, c="g", alpha=0.4)
+
+        # Add context lines for standard Normal scale if applicable
+        plt.axhline(0, color="gray", linestyle="--", alpha=0.5)
+        plt.axvline(0, color="gray", linestyle="--", alpha=0.5)
+
+        plt.ylim(-2, 2)
+        plt.xlabel(predictor_col)
+        plt.ylabel(outcome_col)
+
+        return plt.gca()
+
+    return (plot_linear_regression_prior_predictive,)
 
 
 @app.cell(hide_code=True)
@@ -977,6 +1040,17 @@ def _(waffle_data):
 @app.cell
 def _(plot_divorce_marriage_age):
     plot_divorce_marriage_age()
+    return
+
+
+@app.cell
+def _(sns, waffle_data):
+    sns.pairplot(
+        data=waffle_data.to_pandas()[["divorce_std", "medianAgeMarriage_std", "marriage_std"]],
+        diag_kind="kde",
+        height=2,
+        aspect=1.7,
+    )
     return
 
 
@@ -1003,7 +1077,12 @@ def _(EdgeDraw, mo):
 
 
 @app.cell
-def _(WAFFLE_OUTCOME, np, plt, run_linear_model, waffle_data):
+def _(
+    WAFFLE_OUTCOME,
+    plot_linear_regression_prior_predictive,
+    run_linear_model,
+    waffle_data,
+):
     m5_1_prior = run_linear_model(
         predictors=[waffle_data["medianAgeMarriage_std"].to_numpy()],
         predictors_names=["median_age_std"],
@@ -1012,16 +1091,12 @@ def _(WAFFLE_OUTCOME, np, plt, run_linear_model, waffle_data):
         prior_predictive=True,
     )
 
-    m5_1_x = np.linspace(
-        waffle_data["medianAgeMarriage_std"].min(),
-        waffle_data["medianAgeMarriage_std"].max(),
+    plot_linear_regression_prior_predictive(
+        idata=m5_1_prior,
+        data=waffle_data,
+        predictor_col="medianAgeMarriage_std",
+        outcome_col="divorce_std",
     )
-
-    alpha_plot = m5_1_prior["prior"]["alpha"].to_numpy().flatten()
-    beta_plot = m5_1_prior["prior"]["beta"].to_numpy().flatten()
-    mu_plot = alpha_plot[:, None] + beta_plot[:, None] * m5_1_x
-
-    plt.plot(m5_1_x, mu_plot.T, c="g", alpha=0.4)
     return
 
 
@@ -1039,14 +1114,14 @@ def _(WAFFLE_OUTCOME, run_linear_model, waffle_data):
         outcome=WAFFLE_OUTCOME,
         outcome_name="Divorce_std",
         prior_predictive=False,
-        draws=1000,
+        draws=100,
     )
     return (m5_1_idata,)
 
 
 @app.cell
-def _(m5_1_idata, plot_simple_regression_on_original_scale):
-    plot_simple_regression_on_original_scale(m5_1_idata, "medianAgeMarriage")
+def _(m5_1_idata, plot_simple_regression_on_chosen_scale):
+    plot_simple_regression_on_chosen_scale(m5_1_idata, "medianAgeMarriage")
     return
 
 
@@ -1072,7 +1147,8 @@ def _(EdgeDraw, mo):
     mo.hstack(
         [
             mo.vstack(
-                [mo.md(" "), divorce_marriage_model_latex], justify="center"
+                [mo.md(" "), divorce_marriage_model_latex],
+                justify="center",
             ),
             divorce_marriage_graph,
         ],
@@ -1088,14 +1164,14 @@ def _(WAFFLE_OUTCOME, run_linear_model, waffle_data):
         outcome=WAFFLE_OUTCOME,
         outcome_name="Divorce_std",
         prior_predictive=False,
-        draws=1000,
+        draws=100,
     )
     return (m5_2_idata,)
 
 
 @app.cell
-def _(m5_2_idata, plot_simple_regression_on_original_scale):
-    plot_simple_regression_on_original_scale(m5_2_idata, "marriage")
+def _(m5_2_idata, plot_simple_regression_on_chosen_scale):
+    plot_simple_regression_on_chosen_scale(m5_2_idata, "marriage")
     return
 
 
@@ -1107,9 +1183,7 @@ def _(az, m5_2_idata):
 
 @app.cell(hide_code=True)
 def _(EdgeDraw):
-    divorce_age_marriage_graph = EdgeDraw(
-        names=["Divorce", "Age", "Marriage"], directed=True
-    )
+    divorce_age_marriage_graph = EdgeDraw(names=["Divorce", "Age", "Marriage"], directed=True)
     divorce_age_marriage_graph
     return
 
@@ -1125,7 +1199,7 @@ def _(WAFFLE_OUTCOME, run_linear_model, waffle_data):
         outcome=WAFFLE_OUTCOME,
         outcome_name="Divorce_std",
         prior_predictive=False,
-        draws=1000,
+        draws=100,
     )
     return (m5_3_idata,)
 
@@ -1172,8 +1246,202 @@ def _(mo):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    A popular hypothesis has it that primates with larger brains produce more energetic milk, so that brains can grow quickly. Answering questions of this sort consumes a lot of effort in evolutionary biology, because there are many subtle statistical issues that arise when
+    comparing species.
+
+    The question here is to what extent energy content of milk, measured here by kilocalories, is related to the percent of the brain mass that is neocortex. Neocortex is the gray, outer part of the brain that is particularly elaborated in mammals and especially primates. We’ll end up needing female body mass as well, to see the masking that hides the relationships among the variables.
+    """)
+    return
+
+
 @app.cell
-def _():
+def _(milk_data):
+    complete_milk_data = milk_data.drop_nulls(subset=["neocortex.perc", "mass", "kcal.per.g"])
+    MILK_OUTCOME = complete_milk_data["kcal.per.g_std"].to_numpy()
+    return MILK_OUTCOME, complete_milk_data
+
+
+@app.cell(hide_code=True)
+def _(EdgeDraw, mo):
+    kcal_neoPct_model_latex = mo.md(r"""
+    \[
+    \begin{aligned}
+    K_i &\sim \mathrm{Normal}(\mu_i, \sigma)\\
+    \mu_i &= \alpha + \beta_N N_i
+    \end{aligned}
+    \]
+                        """)
+    kcal_neoPct_graph = EdgeDraw(names=["Kcal", "Neo_perc"], directed=True)
+
+    mo.hstack(
+        [
+            mo.vstack([mo.md(" "), kcal_neoPct_model_latex], justify="center"),
+            kcal_neoPct_graph,
+        ],
+    )
+    return
+
+
+@app.cell
+def _(MILK_OUTCOME, complete_milk_data, run_linear_model):
+    milk_prior = run_linear_model(
+        predictors=[complete_milk_data["neocortex.perc_std"]],
+        predictors_names=["neocortex.perc_std"],
+        outcome=MILK_OUTCOME,
+        outcome_name="kcal.per.g_std",
+        prior_predictive=True,
+        draws=50,
+        alpha_sigma=0.2,
+        beta_sigma=0.5,
+    )
+    return (milk_prior,)
+
+
+@app.cell
+def _(complete_milk_data, milk_prior, plot_linear_regression_prior_predictive):
+    plot_linear_regression_prior_predictive(
+        idata=milk_prior,
+        data=complete_milk_data,
+        predictor_col="neocortex.perc_std",
+        outcome_col="kcal.per.g_std",
+    )
+    return
+
+
+@app.cell
+def _(MILK_OUTCOME, complete_milk_data, run_linear_model):
+    milk_post_neo_pct = run_linear_model(
+        predictors=[complete_milk_data["neocortex.perc_std"]],
+        predictors_names=["neocortex.perc_std"],
+        outcome=MILK_OUTCOME,
+        outcome_name="kcal.per.g_std",
+        prior_predictive=False,
+        draws=100,
+        alpha_sigma=0.2,
+        beta_sigma=0.5,
+    )
+    return (milk_post_neo_pct,)
+
+
+@app.cell
+def _(az, milk_post_neo_pct):
+    az.summary(milk_post_neo_pct, kind="stats")
+    return
+
+
+@app.cell
+def _(
+    complete_milk_data,
+    milk_post_neo_pct,
+    plot_simple_regression_on_chosen_scale,
+):
+    plot_simple_regression_on_chosen_scale(
+        idata=milk_post_neo_pct,
+        predictor_col="neocortex.perc",
+        outcome_col="kcal.per.g",
+        data=complete_milk_data,
+        use_std=True,
+    )
+    return
+
+
+@app.cell
+def _(
+    MILK_OUTCOME,
+    complete_milk_data,
+    plot_simple_regression_on_chosen_scale,
+    run_linear_model,
+):
+    milk_post_mass = run_linear_model(
+        predictors=[complete_milk_data["log_mass_std"]],
+        predictors_names=["log_mass_std"],
+        outcome=MILK_OUTCOME,
+        outcome_name="kcal.per.g_std",
+        prior_predictive=False,
+        draws=100,
+        alpha_sigma=0.2,
+        beta_sigma=0.5,
+    )
+
+    plot_simple_regression_on_chosen_scale(
+        idata=milk_post_mass,
+        predictor_col="log_mass",
+        outcome_col="kcal.per.g",
+        data=complete_milk_data,
+        use_std=True,
+    )
+    return (milk_post_mass,)
+
+
+@app.cell
+def _(az, milk_post_mass, milk_post_neo_pct):
+    az.summary(milk_post_neo_pct, kind="stats"), az.summary(milk_post_mass, kind="stats")
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    kcal_neoPct_mass_model_latex = mo.md(r"""
+    \begin{align*}
+    K_i &\sim \mathcal{N}(\mu_i,\sigma)\\
+    \mu_i &= \alpha + \beta_n N_i + \beta_m M_i\\
+    \alpha &\sim \mathcal{N}(0,0.2)\\
+    \beta_n &\sim \mathcal{N}(0,0.5)\\
+    \beta_m &\sim \mathcal{N}(0,0.5)\\
+    \sigma &\sim \mathrm{Exponential}(1)
+    \end{align*}
+                        """)
+
+    kcal_neoPct_mass_model_latex
+    return
+
+
+@app.cell
+def _(MILK_OUTCOME, complete_milk_data, run_linear_model):
+    milk_post_neo_pct_and_mass = run_linear_model(
+        predictors=[complete_milk_data["neocortex.perc_std"], complete_milk_data["log_mass_std"]],
+        predictors_names=["neocortex.perc_std", "log_mass_std"],
+        outcome=MILK_OUTCOME,
+        outcome_name="kcal.per.g_std",
+        prior_predictive=False,
+        draws=100,
+        alpha_sigma=0.2,
+        beta_sigma=0.5,
+    )
+    return (milk_post_neo_pct_and_mass,)
+
+
+@app.cell
+def _(az, milk_post_mass, milk_post_neo_pct, milk_post_neo_pct_and_mass):
+    az.plot_forest(
+        [milk_post_mass, milk_post_neo_pct, milk_post_neo_pct_and_mass],
+        model_names=["both", "Neocortex", "log_mass"],
+        var_names=["beta"],
+        combined=True,
+        figsize=(10, 5),
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Both predictors become much more relevant when both are present at the same time.
+    """)
+    return
+
+
+@app.cell
+def _(complete_milk_data, sns):
+    sns.pairplot(
+        complete_milk_data.to_pandas()[["neocortex.perc", "log_mass", "kcal.per.g"]],
+        height=2,
+        aspect=1.7,
+        diag_kind="kde",
+    )
     return
 
 
