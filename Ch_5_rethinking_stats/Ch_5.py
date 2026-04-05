@@ -905,7 +905,7 @@ def _(az, np, pm, rng):
             "obs_id": np.arange(len(outcome)),
         }
         # Make every column of the predictors list of arrays a predictor.
-        # Done so that the dot product ccan work. Every predictor multiply one beta.
+        # Done so that the dot product can work. Every predictor multiply one beta.
         predictors = np.vstack([*predictors]).T
 
         with pm.Model(coords=coords) as model:
@@ -918,7 +918,6 @@ def _(az, np, pm, rng):
             sigma = pm.Exponential("sigma", lam=1)
 
             # Linear Model: mu = alpha + X * beta
-            # PyMC handles the matrix multiplication perfectly here
             mu = alpha + pm.math.dot(x_data, beta)
 
             # Likelihood
