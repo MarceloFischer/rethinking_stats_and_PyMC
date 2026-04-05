@@ -50,7 +50,9 @@ def _():
     # Make the layout "tight" by default so labels don't overlap
     plt.rcParams["figure.autolayout"] = True
 
-    az.rcParams["stats.ci_prob"] = 0.89  # sets default credible interval used by arviz
+    az.rcParams["stats.ci_prob"] = (
+        0.89  # sets default credible interval used by arviz
+    )
     return EdgeDraw, Path, az, mo, np, operator, pl, plt, pm, rng, sns
 
 
@@ -89,21 +91,33 @@ def _(mo):
 
 
 @app.cell
-def _(operator, pl):
+def _(pl):
     def cols_to_lowercase(dataf: pl.DataFrame) -> pl.DataFrame:
-        return dataf.rename({col: col[0].lower() + col[1:] for col in dataf.columns})
+        return dataf.rename(
+            {col: col[0].lower() + col[1:] for col in dataf.columns}
+        )
+
+    return (cols_to_lowercase,)
 
 
+@app.cell
+def _(pl):
     def std_cols_of_interest(dataf: pl.DataFrame, cols: list[str]) -> pl.DataFrame:
         # add standardised columns
         return dataf.with_columns(
             [
-                ((pl.col(col) - pl.col(col).mean()) / pl.col(col).std()).alias(f"{col}_std")
+                ((pl.col(col) - pl.col(col).mean()) / pl.col(col).std()).alias(
+                    f"{col}_std"
+                )
                 for col in cols
             ]
         )
 
+    return (std_cols_of_interest,)
 
+
+@app.cell
+def _(pl):
     # fmt: off
     def std_log_mass(dataf: pl.DataFrame) -> pl.DataFrame:
         # add standardised columns
@@ -113,8 +127,11 @@ def _(operator, pl):
                 .with_columns(log_mass_std=(pl.col("log_mass") - pl.col("log_mass").mean()) / pl.col("log_mass").std())
     )
     # fmt: on
+    return (std_log_mass,)
 
 
+@app.cell
+def _(operator, pl):
     def filter_by_comparison(
         df: pl.DataFrame, col_name: str, value: float, op_str: str
     ) -> pl.DataFrame:
@@ -131,17 +148,17 @@ def _(operator, pl):
         # Equivalent to: df.filter(pl.col(col_name) >= value)
         return df.filter(ops[op_str](pl.col(col_name), value))
 
+    return (filter_by_comparison,)
 
+
+@app.cell
+def _(pl):
     def set_dtypes_float64(dataf: pl.DataFrame, cols: list[str]) -> pl.DataFrame:
-        return dataf.with_columns([pl.col(col).cast(pl.Float64, strict=False) for col in cols])
+        return dataf.with_columns(
+            [pl.col(col).cast(pl.Float64, strict=False) for col in cols]
+        )
 
-    return (
-        cols_to_lowercase,
-        filter_by_comparison,
-        set_dtypes_float64,
-        std_cols_of_interest,
-        std_log_mass,
-    )
+    return (set_dtypes_float64,)
 
 
 @app.cell(hide_code=True)
@@ -153,33 +170,41 @@ def _(mo):
 
 
 @app.cell
-def _(
-    cols_to_lowercase,
-    filter_by_comparison,
-    raw_howell_data,
-    raw_milk_data,
-    raw_waffle_data,
-    set_dtypes_float64,
-    std_cols_of_interest,
-    std_log_mass,
-):
+def _(cols_to_lowercase, raw_waffle_data, std_cols_of_interest):
     # fmt: off
     waffle_data = (
         raw_waffle_data
         .pipe(cols_to_lowercase)
         .pipe(std_cols_of_interest, ["divorce", "medianAgeMarriage", "marriage"])
     )
+    # fmt: on
+    return (waffle_data,)
 
+
+@app.cell
+def _(filter_by_comparison, raw_howell_data):
+    # fmt: off
     howell_adults = (
         raw_howell_data
         .pipe(filter_by_comparison, "age", 18, ">=")
-    )
+    ) # fmt: on
+    return (howell_adults,)
 
+
+@app.cell
+def _(filter_by_comparison, raw_howell_data):
+    # fmt: off
     howell_children = (
         raw_howell_data
         .pipe(filter_by_comparison, "age", 13, "<=")
     )
+    # fmt: on
+    return
 
+
+@app.cell
+def _(raw_milk_data, set_dtypes_float64, std_cols_of_interest, std_log_mass):
+    # fmt: off
     milk_data = (
         raw_milk_data
         .pipe(set_dtypes_float64, ["kcal.per.g", "neocortex.perc"])
@@ -187,7 +212,7 @@ def _(
         .pipe(std_log_mass)
     )
     # fmt: on
-    return howell_adults, milk_data, waffle_data
+    return (milk_data,)
 
 
 @app.cell
@@ -277,7 +302,9 @@ def _(np, pl, rng):
             A polars DataFrame containing simulated weight, height, and male indicator.
         """
         n_samples = len(sex_arr)
-        h = np.where(sex_arr, male_avg_height, female_avg_height) + rng.normal(0, 5, n_samples)
+        h = np.where(sex_arr, male_avg_height, female_avg_height) + rng.normal(
+            0, 5, n_samples
+        )
         w = alphas[sex_arr] + betas[sex_arr] * h + rng.normal(0, 5, n_samples)
 
         return pl.DataFrame({"weight": w, "height": h, "male": sex_arr})
@@ -287,7 +314,9 @@ def _(np, pl, rng):
 
 @app.cell
 def _(pl, rng, sim_synthetic_people):
-    def howell_SW_testing(n_samples: int = 200, **kwargs) -> tuple[pl.DataFrame, pl.DataFrame]:
+    def howell_SW_testing(
+        n_samples: int = 200, **kwargs
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """
         Simulates balanced synthetic datasets for females and males for testing.
 
@@ -353,7 +382,9 @@ def _(SEX, az, howell_adults, np, pl, pm, rng):
                 weight = pm.Normal("weight", mu=mu, sigma=sigma)
                 idata = pm.sample_prior_predictive(draws, random_seed=rng)
             else:
-                weight = pm.Normal("weight", mu=mu, sigma=sigma, observed=data["weight"])
+                weight = pm.Normal(
+                    "weight", mu=mu, sigma=sigma, observed=data["weight"]
+                )
                 idata = pm.sample(draws, random_seed=rng)
 
             return idata, sex_weight_model
@@ -495,11 +526,17 @@ def _(SEX, az, np, plt, rng):
         avg_m_alpha = idata["posterior"]["alpha"].sel(sex="M").mean(dim=["chain"])
         avg_f_alpha = idata["posterior"]["alpha"].sel(sex="F").mean(dim=["chain"])
         avg_sigma = idata["posterior"]["sigma"].mean(dim="chain")
-        male_post_samples = rng.normal(avg_m_alpha, avg_sigma)  # k draws from the normal
-        female_post_samples = rng.normal(avg_f_alpha, avg_sigma)  # k draws from the normal
+        male_post_samples = rng.normal(
+            avg_m_alpha, avg_sigma
+        )  # k draws from the normal
+        female_post_samples = rng.normal(
+            avg_f_alpha, avg_sigma
+        )  # k draws from the normal
         post_weight_contrast = male_post_samples - female_post_samples
 
-        post_weight_contrast_plot = az.plot_dist(post_weight_contrast, color="black")
+        post_weight_contrast_plot = az.plot_dist(
+            post_weight_contrast, color="black"
+        )
 
         ##################################################
         # Shade underneath posterior predictive contrast #
@@ -567,7 +604,8 @@ def _(SEX, az, howell_adults, pl, plt):
             plt.plot(
                 original_data["height"],
                 posterior["alpha"].sel(sex=s).mean()
-                + posterior["beta"].sel(sex=s).mean() * (cte_data["height"] - cte_data["h_bar"]),
+                + posterior["beta"].sel(sex=s).mean()
+                * (cte_data["height"] - cte_data["h_bar"]),
                 label=f"{s}",
                 c=f"C{idx}",
             )
@@ -1023,10 +1061,55 @@ def _(az, np, pl, plt):
     return (plot_linear_regression_prior_predictive,)
 
 
+@app.cell
+def _(az, np, plt):
+    def plot_counterfactual(
+        post_trace: az.InferenceData, 
+        predictor_name: str = "neocortex.perc_std",
+        control_name: str = "log_mass_std"
+    ) -> plt.Axes:
+        # 1. Create counterfactual data: vary predictor from -2 to 2, hold control at 0
+        seq = np.linspace(-2, 2, 50)
+    
+        # 2. Extract posterior samples
+        post = post_trace.posterior
+        alpha = post["alpha"].values  # shape (chains, draws)
+        beta_pred = post["beta"].sel(predictors=predictor_name).values  # shape (chains, draws)
+        # beta_control is extracted but term drops out because control value is 0
+    
+        # 3. Calculate mu for each point in seq across all samples
+        # Broadcast to (chains, draws, 50)
+        mu_pred = alpha[:, :, np.newaxis] + beta_pred[:, :, np.newaxis] * seq
+    
+        # 4. Summarize the predictions
+        mu_mean = mu_pred.mean(axis=(0, 1))
+        mu_samples = mu_pred.reshape(-1, 50)
+        mu_hdi = az.hdi(mu_samples, hdi_prob=0.89)
+    
+        # 5. Plot
+        plt.figure(figsize=(8, 5))
+        plt.plot(seq, mu_mean, label=f"Counterfactual: {predictor_name}")
+        plt.fill_between(
+            seq, 
+            mu_hdi[:, 0], 
+            mu_hdi[:, 1], 
+            alpha=0.2,
+        )
+    
+        plt.xlabel(f"{predictor_name} (std)")
+        plt.ylabel("Predicted kcal per g (std)")
+        plt.title(f"Effect of {predictor_name} (holding {control_name} constant)")
+        plt.legend()
+    
+        return plt.gca()
+
+    return (plot_counterfactual,)
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Section 5.1
+    ## Section 5.1
     """)
     return
 
@@ -1046,7 +1129,10 @@ def _(plot_divorce_marriage_age):
 @app.cell
 def _(sns, waffle_data):
     sns.pairplot(
-        data=waffle_data.to_pandas()[["divorce_std", "medianAgeMarriage_std", "marriage_std"]],
+        data=waffle_data.to_pandas()[
+            ["divorce_std", "medianAgeMarriage_std", "marriage_std"]
+        ],
+        kind="reg",
         diag_kind="kde",
         height=2,
         aspect=1.7,
@@ -1183,7 +1269,9 @@ def _(az, m5_2_idata):
 
 @app.cell(hide_code=True)
 def _(EdgeDraw):
-    divorce_age_marriage_graph = EdgeDraw(names=["Divorce", "Age", "Marriage"], directed=True)
+    divorce_age_marriage_graph = EdgeDraw(
+        names=["Divorce", "Age", "Marriage"], directed=True
+    )
     divorce_age_marriage_graph
     return
 
@@ -1241,7 +1329,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Section 5.2
+    ## Section 5.2
     """)
     return
 
@@ -1259,7 +1347,9 @@ def _(mo):
 
 @app.cell
 def _(milk_data):
-    complete_milk_data = milk_data.drop_nulls(subset=["neocortex.perc", "mass", "kcal.per.g"])
+    complete_milk_data = milk_data.drop_nulls(
+        subset=["neocortex.perc", "mass", "kcal.per.g"]
+    )
     MILK_OUTCOME = complete_milk_data["kcal.per.g_std"].to_numpy()
     return MILK_OUTCOME, complete_milk_data
 
@@ -1378,12 +1468,15 @@ def _(
 
 @app.cell
 def _(az, milk_post_mass, milk_post_neo_pct):
-    az.summary(milk_post_neo_pct, kind="stats"), az.summary(milk_post_mass, kind="stats")
+    (
+        az.summary(milk_post_neo_pct, kind="stats"),
+        az.summary(milk_post_mass, kind="stats"),
+    )
     return
 
 
 @app.cell(hide_code=True)
-def _(mo):
+def _(EdgeDraw, mo):
     kcal_neoPct_mass_model_latex = mo.md(r"""
     \begin{align*}
     K_i &\sim \mathcal{N}(\mu_i,\sigma)\\
@@ -1395,14 +1488,24 @@ def _(mo):
     \end{align*}
                         """)
 
-    kcal_neoPct_mass_model_latex
+    kcal_neoPct_mass_graph = EdgeDraw(names=["Kcal", "Neo_perc", "Mass"], directed=True)
+
+    mo.hstack(
+        [
+            mo.vstack([mo.md(" "), kcal_neoPct_mass_model_latex], justify="center"),
+            kcal_neoPct_mass_graph,
+        ],
+    )
     return
 
 
 @app.cell
 def _(MILK_OUTCOME, complete_milk_data, run_linear_model):
     milk_post_neo_pct_and_mass = run_linear_model(
-        predictors=[complete_milk_data["neocortex.perc_std"], complete_milk_data["log_mass_std"]],
+        predictors=[
+            complete_milk_data["neocortex.perc_std"],
+            complete_milk_data["log_mass_std"],
+        ],
         predictors_names=["neocortex.perc_std", "log_mass_std"],
         outcome=MILK_OUTCOME,
         outcome_name="kcal.per.g_std",
@@ -1430,6 +1533,8 @@ def _(az, milk_post_mass, milk_post_neo_pct, milk_post_neo_pct_and_mass):
 def _(mo):
     mo.md(r"""
     Both predictors become much more relevant when both are present at the same time.
+
+    What happened here? Why did adding neocortex and body mass to the same model lead to larger estimated effects of both? This is a context in which there are two variables correlated with the outcome, but one is positively correlated with it and the other is negatively correlated with it. In addition, both of the explanatory variables are positively correlated with one another.
     """)
     return
 
@@ -1437,16 +1542,26 @@ def _(mo):
 @app.cell
 def _(complete_milk_data, sns):
     sns.pairplot(
-        complete_milk_data.to_pandas()[["neocortex.perc", "log_mass", "kcal.per.g"]],
+        complete_milk_data.to_pandas()[
+            ["neocortex.perc", "log_mass", "kcal.per.g"]
+        ],
         height=2,
         aspect=1.7,
         diag_kind="kde",
+        kind="reg"
     )
     return
 
 
 @app.cell
-def _():
+def _(milk_post_neo_pct_and_mass, plot_counterfactual):
+    plot_counterfactual(milk_post_neo_pct_and_mass, predictor_name="neocortex.perc_std", control_name="log_mass_std")
+    return
+
+
+@app.cell
+def _(milk_post_neo_pct_and_mass, plot_counterfactual):
+    plot_counterfactual(milk_post_neo_pct_and_mass, predictor_name="log_mass_std", control_name="neocortex.perc_std")
     return
 
 
