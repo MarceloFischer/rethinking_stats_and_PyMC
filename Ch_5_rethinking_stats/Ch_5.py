@@ -1063,46 +1063,41 @@ def _(az, np, pl, plt):
 
 @app.cell
 def _(az, np, plt):
+    # fmt: off
     def plot_counterfactual(
-        post_trace: az.InferenceData, 
+        post_trace: az.InferenceData,
         predictor_name: str = "neocortex.perc_std",
-        control_name: str = "log_mass_std"
+        control_name: str = "log_mass_std",
     ) -> plt.Axes:
         # 1. Create counterfactual data: vary predictor from -2 to 2, hold control at 0
         seq = np.linspace(-2, 2, 50)
-    
+
         # 2. Extract posterior samples
         post = post_trace.posterior
         alpha = post["alpha"].values  # shape (chains, draws)
-        beta_pred = post["beta"].sel(predictors=predictor_name).values  # shape (chains, draws)
+        beta_pred = (post["beta"].sel(predictors=predictor_name).values)  # shape (chains, draws)
         # beta_control is extracted but term drops out because control value is 0
-    
+
         # 3. Calculate mu for each point in seq across all samples
         # Broadcast to (chains, draws, 50)
         mu_pred = alpha[:, :, np.newaxis] + beta_pred[:, :, np.newaxis] * seq
-    
+
         # 4. Summarize the predictions
-        mu_mean = mu_pred.mean(axis=(0, 1))
-        mu_samples = mu_pred.reshape(-1, 50)
+        mu_mean = mu_pred.mean(axis=(0, 1))  # avg chain/draws
+        mu_samples = mu_pred.reshape(-1, 50)  # flatten chain/draws but keep the 50 x_values (total_draws, 50)
         mu_hdi = az.hdi(mu_samples, hdi_prob=0.89)
-    
+
         # 5. Plot
-        plt.figure(figsize=(8, 5))
         plt.plot(seq, mu_mean, label=f"Counterfactual: {predictor_name}")
-        plt.fill_between(
-            seq, 
-            mu_hdi[:, 0], 
-            mu_hdi[:, 1], 
-            alpha=0.2,
-        )
-    
+        az.plot_hdi(seq, mu_hdi.T)
+
         plt.xlabel(f"{predictor_name} (std)")
         plt.ylabel("Predicted kcal per g (std)")
         plt.title(f"Effect of {predictor_name} (holding {control_name} constant)")
         plt.legend()
-    
-        return plt.gca()
 
+        return plt.gca()
+    # fmt: on
     return (plot_counterfactual,)
 
 
@@ -1488,11 +1483,15 @@ def _(EdgeDraw, mo):
     \end{align*}
                         """)
 
-    kcal_neoPct_mass_graph = EdgeDraw(names=["Kcal", "Neo_perc", "Mass"], directed=True)
+    kcal_neoPct_mass_graph = EdgeDraw(
+        names=["Kcal", "Neo_perc", "Mass"], directed=True
+    )
 
     mo.hstack(
         [
-            mo.vstack([mo.md(" "), kcal_neoPct_mass_model_latex], justify="center"),
+            mo.vstack(
+                [mo.md(" "), kcal_neoPct_mass_model_latex], justify="center"
+            ),
             kcal_neoPct_mass_graph,
         ],
     )
@@ -1548,20 +1547,28 @@ def _(complete_milk_data, sns):
         height=2,
         aspect=1.7,
         diag_kind="kde",
-        kind="reg"
+        kind="reg",
     )
     return
 
 
 @app.cell
 def _(milk_post_neo_pct_and_mass, plot_counterfactual):
-    plot_counterfactual(milk_post_neo_pct_and_mass, predictor_name="neocortex.perc_std", control_name="log_mass_std")
+    plot_counterfactual(
+        milk_post_neo_pct_and_mass,
+        predictor_name="neocortex.perc_std",
+        control_name="log_mass_std",
+    )
     return
 
 
 @app.cell
 def _(milk_post_neo_pct_and_mass, plot_counterfactual):
-    plot_counterfactual(milk_post_neo_pct_and_mass, predictor_name="log_mass_std", control_name="neocortex.perc_std")
+    plot_counterfactual(
+        milk_post_neo_pct_and_mass,
+        predictor_name="log_mass_std",
+        control_name="neocortex.perc_std",
+    )
     return
 
 
