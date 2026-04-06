@@ -6,9 +6,9 @@ app = marimo.App(width="columns")
 
 @app.cell
 def _():
-    import marimo as mo
-    import numpy as np
     import math
+
+    import marimo as mo
 
     TOTAL_PEOPLE = 10
     TOTAL_WINS = 8
@@ -69,7 +69,7 @@ def _(calculate_total_ways_to_observe_sample):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(f"""
+    mo.md("""
     The number os honest people that maximises the ways to realise the sample is 7.
     """)
     return

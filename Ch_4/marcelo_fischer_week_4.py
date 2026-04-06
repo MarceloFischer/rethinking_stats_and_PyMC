@@ -19,9 +19,6 @@ def _():
     import matplotlib.pyplot as plt
     import numpy as np
     import polars as pl
-    import pymc as pm
-    import scipy as sp
-    from scipy.stats import beta, binom, norm
 
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)

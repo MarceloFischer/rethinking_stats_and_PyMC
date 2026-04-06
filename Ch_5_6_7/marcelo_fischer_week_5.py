@@ -7,14 +7,9 @@ app = marimo.App(width="columns")
 @app.cell(column=0)
 def _():
     import arviz as az
-    import marimo as mo
     import matplotlib.pyplot as plt
-    import altair as alt
     import numpy as np
     import polars as pl
-    import pymc as pm
-    import scipy as sp
-    from scipy.stats import beta, binom, norm
 
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)

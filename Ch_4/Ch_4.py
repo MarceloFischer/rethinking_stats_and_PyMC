@@ -27,7 +27,6 @@ def _(mo):
 
 @app.cell
 def _():
-    import altair as alt
     import arviz as az
     import marimo as mo
     import matplotlib.pyplot as plt

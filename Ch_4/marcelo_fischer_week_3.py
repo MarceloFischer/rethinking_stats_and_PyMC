@@ -6,15 +6,13 @@ app = marimo.App(width="columns")
 
 @app.cell(column=0)
 def _():
-    import altair as alt
     import arviz as az
     import marimo as mo
     import matplotlib.pyplot as plt
     import numpy as np
     import polars as pl
     import pymc as pm
-    import scipy as sp
-    from scipy.stats import beta, binom, norm
+    from scipy.stats import norm
 
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)

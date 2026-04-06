@@ -28,15 +28,13 @@ def _(mo):
 
 @app.cell
 def _():
-    import marimo as mo
-    import polars as pl
-    import numpy as np
-    import scipy as sp
-    from scipy.stats import binom, beta
-    import arviz as az
-    import pymc as pm
     import altair as alt
+    import arviz as az
+    import marimo as mo
     import matplotlib.pyplot as plt
+    import numpy as np
+    import polars as pl
+    from scipy.stats import binom
     return alt, az, binom, mo, np, pl, plt
 
 

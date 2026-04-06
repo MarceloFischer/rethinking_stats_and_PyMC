@@ -38,11 +38,10 @@ def std_cols_of_interest(dataf: pl.DataFrame, cols: list[str]) -> pl.DataFrame:
 @app.function
 def std_log_mass(dataf: pl.DataFrame) -> pl.DataFrame:
     # add standardised columns
-    return (
-        dataf
-        .with_columns(log_mass=pl.col("mass").log())
-        .with_columns(log_mass_std=(pl.col("log_mass") - pl.col("log_mass").mean()) / pl.col("log_mass").std())
-)
+    return dataf.with_columns(log_mass=pl.col("mass").log()).with_columns(
+        log_mass_std=(pl.col("log_mass") - pl.col("log_mass").mean())
+        / pl.col("log_mass").std()
+    )
 
 
 @app.function
@@ -180,7 +179,9 @@ def plot_counterfactual(
     # 2. Extract posterior samples
     post = post_trace.posterior
     alpha = post["alpha"].values  # shape (chains, draws)
-    beta_pred = (post["beta"].sel(predictors=predictor_name).values)  # shape (chains, draws)
+    beta_pred = (
+        post["beta"].sel(predictors=predictor_name).values
+    )  # shape (chains, draws)
     # beta_control is extracted but term drops out because control value is 0
 
     # 3. Calculate mu for each point in seq across all samples
@@ -189,7 +190,9 @@ def plot_counterfactual(
 
     # 4. Summarize the predictions
     mu_mean = mu_pred.mean(axis=(0, 1))  # avg chain/draws
-    mu_samples = mu_pred.reshape(-1, 50)  # flatten chain/draws but keep the 50 x_values (total_draws, 50)
+    mu_samples = mu_pred.reshape(
+        -1, 50
+    )  # flatten chain/draws but keep the 50 x_values (total_draws, 50)
     mu_hdi = az.hdi(mu_samples, hdi_prob=0.89)
 
     # 5. Plot
@@ -212,8 +215,8 @@ def run_linear_model(
     outcome_name: str,
     prior_predictive: bool = False,
     draws: int = 100,
-    alpha_sigma: float = 0.2,
-    beta_sigma: float = 0.5,
+    alpha: float = 0.2,
+    beta: float = 0.5,
 ) -> az.InferenceData:
     """
     Fits a Bayesian linear regression model using PyMC.
@@ -225,8 +228,8 @@ def run_linear_model(
         outcome_name: A string name for the outcome variable (used in the model).
         prior_predictive: If True, samples from the prior predictive distribution instead of the posterior.
         draws: Number of samples to draw.
-        alpha_sigma: Standard deviation for the intercept prior.
-        beta_sigma: Standard deviation for the predictor coefficients prior.
+        alpha: Standard deviation for the intercept prior.
+        beta: Standard deviation for the predictor coefficients prior.
 
     Returns:
         An ArViz InferenceData object containing the model samples.
@@ -244,8 +247,8 @@ def run_linear_model(
         x_data = pm.Data("x_data", predictors, dims=("obs_id", "predictors"))
 
         # Priors
-        alpha = pm.Normal("alpha", 0, alpha_sigma)
-        beta = pm.Normal("beta", mu=0, sigma=beta_sigma, dims="predictors")
+        alpha = pm.Normal("alpha", 0, alpha)
+        beta = pm.Normal("beta", mu=0, sigma=beta, dims="predictors")
         sigma = pm.Exponential("sigma", lam=1)
 
         # Linear Model: mu = alpha + X * beta

@@ -27,29 +27,26 @@ app = marimo.App(width="columns")
 @app.cell(column=0)
 def _():
     import operator
-    import altair as alt
-    from typing import Optional
+    from pathlib import Path
+
     import arviz as az
     import marimo as mo
     import matplotlib.pyplot as plt
-    import seaborn as sns
     import numpy as np
     import polars as pl
     import pymc as pm
-    import scipy.stats as stats
-    from pathlib import Path
-    from wigglystuff import EdgeDraw
-
+    import seaborn as sns
     from linear_models_funcs import (
         cols_to_lowercase,
+        plot_counterfactual,
+        plot_linear_regression_prior_predictive,
+        plot_simple_regression_on_chosen_scale,
+        run_linear_model,
+        set_dtypes_float64,
         std_cols_of_interest,
         std_log_mass,
-        set_dtypes_float64,
-        plot_simple_regression_on_chosen_scale,
-        plot_linear_regression_prior_predictive,
-        plot_counterfactual,
-        run_linear_model,
     )
+    from wigglystuff import EdgeDraw
 
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
