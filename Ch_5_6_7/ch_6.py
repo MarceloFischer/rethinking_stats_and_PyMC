@@ -1,6 +1,24 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "altair==6.0.0",
+#     "arviz==0.23.4",
+#     "hvplot==0.12.2",
+#     "marimo>=0.22.4",
+#     "matplotlib==3.10.8",
+#     "numpy==2.4.4",
+#     "polars==1.39.3",
+#     "pyarrow==23.0.1",
+#     "pymc==5.28.3",
+#     "scipy==1.17.1",
+#     "seaborn==0.13.2",
+#     "wigglystuff==0.3.1",
+# ]
+# ///
+
 import marimo
 
-__generated_with = "0.22.4"
+__generated_with = "0.23.2"
 app = marimo.App(width="columns")
 
 
@@ -28,6 +46,7 @@ def _():
     from wigglystuff import EdgeDraw
 
     from linear_models_funcs import (
+        remove_period_col_name,
         cols_to_lowercase,
         std_cols_of_interest,
         std_log_mass,
@@ -40,7 +59,25 @@ def _():
 
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
+    return (
+        Path,
+        az,
+        mo,
+        pl,
+        plt,
+        remove_period_col_name,
+        run_linear_model,
+        set_dtypes_float64,
+        sns,
+        std_cols_of_interest,
+        std_log_mass,
+    )
+
+
+@app.cell
+def _(az, plt):
     plt.style.use("fivethirtyeight")
+
     # Set default figure size to 14 inches wide by 5 inches tall
     plt.rcParams["figure.figsize"] = (14, 5)
     # You can also set the DPI (dots per inch) for crisper images
@@ -49,17 +86,7 @@ def _():
     plt.rcParams["figure.autolayout"] = True
     # sets default credible interval used by arviz
     az.rcParams["stats.ci_prob"] = 0.89
-    return (
-        Path,
-        az,
-        mo,
-        pl,
-        run_linear_model,
-        set_dtypes_float64,
-        sns,
-        std_cols_of_interest,
-        std_log_mass,
-    )
+    return
 
 
 @app.cell(hide_code=True)
@@ -82,12 +109,19 @@ def _(Path, pl):
 
 
 @app.cell
-def _(raw_milk_data, set_dtypes_float64, std_cols_of_interest, std_log_mass):
+def _(
+    raw_milk_data,
+    remove_period_col_name,
+    set_dtypes_float64,
+    std_cols_of_interest,
+    std_log_mass,
+):
     # fmt: off
     milk_data = (
         raw_milk_data
-        .pipe(set_dtypes_float64, ["kcal.per.g", "neocortex.perc"])
-        .pipe(std_cols_of_interest, ["kcal.per.g", "neocortex.perc", "perc.fat", "perc.lactose"])
+        .pipe(remove_period_col_name)
+        .pipe(set_dtypes_float64, ["kcal_per_g", "neocortex_perc"])
+        .pipe(std_cols_of_interest, ["kcal_per_g", "neocortex_perc", "perc_fat", "perc_lactose"])
         .pipe(std_log_mass)
     )
     # fmt: on
@@ -101,12 +135,8 @@ def _(milk_data):
 
 
 @app.cell
-def _():
-    return
-
-
-@app.cell
-def _():
+def _(milk_data):
+    milk_data.hvplot.scatter(x="perc_lactose", y="perc_fat", by="clade", aspect=2.5, fontscale=1.5)
     return
 
 
@@ -127,7 +157,7 @@ def _(mo):
 def _(milk_data, sns):
     sns.pairplot(
         data=milk_data.select(
-            ["perc.fat_std", "perc.lactose_std", "kcal.per.g_std", "clade"]
+            ["perc_fat_std", "perc_lactose_std", "kcal_per_g_std", "clade"]
         ).to_pandas(),
         # hue="clade",
         diag_kind="kde",
@@ -141,10 +171,10 @@ def _(milk_data, sns):
 @app.cell
 def _(milk_data, run_linear_model):
     fat_model = run_linear_model(
-        predictors=[milk_data["perc.fat_std"]],
-        predictors_names=["perc.fat_std"],
-        outcome=milk_data["kcal.per.g_std"],
-        outcome_name="kcal.per.g_std",
+        predictors=[milk_data["perc_fat_std"]],
+        predictors_names=["perc_fat_std"],
+        outcome=milk_data["kcal_per_g_std"],
+        outcome_name="kcal_per_g_std",
         prior_predictive=False,
         draws=1000,
         alpha=0.2,
@@ -152,10 +182,10 @@ def _(milk_data, run_linear_model):
     )
 
     lactose_model = run_linear_model(
-        predictors=[milk_data["perc.lactose_std"]],
-        predictors_names=["perc.lactose_std"],
-        outcome=milk_data["kcal.per.g_std"],
-        outcome_name="kcal.per.g_std",
+        predictors=[milk_data["perc_lactose_std"]],
+        predictors_names=["perc_lactose_std"],
+        outcome=milk_data["kcal_per_g_std"],
+        outcome_name="kcal_per_g_std",
         prior_predictive=False,
         draws=1000,
         alpha=0.2,
@@ -163,10 +193,10 @@ def _(milk_data, run_linear_model):
     )
 
     lactose_fat_model = run_linear_model(
-        predictors=[milk_data["perc.fat_std"], milk_data["perc.lactose_std"]],
-        predictors_names=["perc.fat_std", "perc.lactose_std"],
-        outcome=milk_data["kcal.per.g_std"],
-        outcome_name="kcal.per.g_std",
+        predictors=[milk_data["perc_fat_std"], milk_data["perc_lactose_std"]],
+        predictors_names=["perc_fat_std", "perc_lactose_std"],
+        outcome=milk_data["kcal_per_g_std"],
+        outcome_name="kcal_per_g_std",
         prior_predictive=False,
         draws=1000,
         alpha=0.2,

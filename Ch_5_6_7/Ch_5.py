@@ -20,7 +20,7 @@
 
 import marimo
 
-__generated_with = "0.22.4"
+__generated_with = "0.23.2"
 app = marimo.App(width="columns")
 
 
