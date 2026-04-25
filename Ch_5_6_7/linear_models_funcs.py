@@ -1,3 +1,16 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "arviz==0.23.4",
+#     "marimo>=0.22.4",
+#     "matplotlib==3.10.8",
+#     "numpy==2.4.4",
+#     "polars==1.39.3",
+#     "pymc==5.28.3",
+#     "scipy==1.17.1",
+# ]
+# ///
+
 import marimo
 
 __generated_with = "0.22.4"
@@ -13,6 +26,13 @@ with app.setup:
 
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
+
+
+@app.function
+def remove_period_col_name(dataf: pl.DataFrame) -> pl.DataFrame:
+    return dataf.rename(
+        {col: col.replace(".", "_") for col in dataf.columns}
+    )
 
 
 @app.function
