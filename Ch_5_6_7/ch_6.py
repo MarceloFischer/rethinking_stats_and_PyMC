@@ -18,7 +18,7 @@
 
 import marimo
 
-__generated_with = "0.23.2"
+__generated_with = "0.23.3"
 app = marimo.App(width="columns")
 
 
@@ -61,11 +61,14 @@ def _():
     rng = np.random.default_rng(RANDOM_SEED)
     return (
         Path,
+        alt,
         az,
         mo,
+        np,
         pl,
         plt,
         remove_period_col_name,
+        rng,
         run_linear_model,
         set_dtypes_float64,
         sns,
@@ -135,8 +138,48 @@ def _(milk_data):
 
 
 @app.cell
-def _(milk_data):
-    milk_data.hvplot.scatter(x="perc_lactose", y="perc_fat", by="clade", aspect=2.5, fontscale=1.5)
+def _(alt, milk_data, mo):
+    _chart = (
+        alt.Chart(milk_data)
+        .mark_circle(size=100, opacity=0.7)
+        .encode(
+            x=alt.X(
+                "perc_lactose:Q",
+                title="Percentage Lactose",
+                axis=alt.Axis(labelFontSize=12, titleFontSize=14, gridOpacity=0.3),
+            ),
+            y=alt.Y(
+                "perc_fat:Q",
+                title="Percentage Fat",
+                axis=alt.Axis(labelFontSize=12, titleFontSize=14, gridOpacity=0.3),
+            ),
+            color=alt.Color(
+                "clade:N",
+                title="Clade",
+                scale=alt.Scale(scheme="tableau10"),
+                legend=alt.Legend(
+                    titleFontSize=13, labelFontSize=11, symbolSize=80, orient="right"
+                ),
+            ),
+        )
+        .properties(
+            width="container",
+            height=400,
+            title={
+                "text": "Relationship between Lactose and Fat by Clade",
+                "fontSize": 16,
+                "fontWeight": "bold",
+                "subtitle": "Each point represents a mammal species",
+                "subtitleFontSize": 12,
+                "subtitleColor": "#666666",
+                "offset": 10,
+            },
+        )
+        .configure_view(strokeWidth=0)
+        .interactive()
+    )
+
+    mo.ui.altair_chart(_chart)
     return
 
 
@@ -149,6 +192,14 @@ def _():
 def _(mo):
     mo.md(r"""
     # Chater Notes
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Multicollinearity
     """)
     return
 
@@ -226,6 +277,87 @@ def _(mo):
     Now the posterior means of both perc.fat and perc.lactose are closer to zero. And the standard deviations for both parameters are twice as large as in the bivariate models. This is the same statistical phenomenon as in the leg length example. What has happened is that the variables perc.fat and perc.lactose contain much of the same information. They are almost substitutes for one another. As a result, when you include both in a regression, the posterior distribution ends up describing a long ridge of combinations of perc.fat and perc.lactose that are equally plausible.
     """)
     return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Post-treatment Bias
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Fungus example page 175
+    """)
+    return
+
+
+@app.cell
+def _(np, pl, rng):
+    _n = 100
+    _h0 = rng.normal(10, 2, size=_n)
+    _treatment = np.repeat([0, 1], _n / 2)
+    _fungus = rng.binomial(n=1, p=0.5 - _treatment * 0.4, size=_n)
+    _h1 = _h0 + rng.normal(5 - 3 * _fungus, size=_n)
+
+    _d = pl.DataFrame({"h0": _h0, "h1": _h1, "treatment": _treatment, "funfus": _fungus})
+
+    _d
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    We know that the plants at time $t = 1$ should be taller than at time $t = 0$, whatever scale they are measured on. So if we put the parameters on a scale of proportion of height at time $t = 0$, rather than on the absolute scale of the data, we can set the priors more easily. To make this simpler, let’s focus right now only on the height variables, ignoring the predictor variables. We might have a linear model like:
+
+    $$ h_{1,i} \sim \text{Normal}(\mu_i, \sigma) $$
+    $$ \mu_i = h_{0,i} \times p $$
+
+    where h0,i is plant i’s height at time $t = 0$, h1,i is its height at time $t = 1$, and p is a parameter measuring the proportion of h0,i that h1,i is. More precisely, $p=\frac{h_{1,i}}{h_{0,i}}$ . If p = 1, the plant hasn’t changed at all from time $t = 0$ to time $t = 1$. If p = 2, it has doubled in height. So if we center our prior for p on 1, that implies an expectation of no change in height. That is less than we know. But we should allow p to be less than 1, in case the experiment goes horribly wrong and we kill all the plants. We also have to ensure that p > 0, because it is a proportion. A Log-Normal distribution, because it is always positive. If we use p ∼ Log-Normal(0, 0.25) (draw garph to see what it looks like).
+    """)
+    return
+
+
+@app.cell
+def _(az, rng):
+    (
+        az.summary(rng.lognormal(0, 0.25, 1000), kind="stats"),
+        az.plot_dist(rng.lognormal(0, 0.25, 1000)),
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    So this prior expects anything from 40% shrinkage up to 40% growth. Now to include the treatment and fungus variables. We’ll include both of them, following the notion that we’d like to measure the impact of both the treatment and the fungus itself. The parameters for these variables will also be on the pro- portion scale. They will be changes in proportion growth. So we’re going to make a linear model of p:
+
+    \begin{aligned}
+    h_{1,i} &\sim \mathcal{N}(\mu_i,\sigma)\\
+    \mu_i &= h_{0,i} \times p\\
+    p &= \alpha + \beta_T T_i + \beta_F F_i\\
+    \alpha &\sim \mathrm{Log\text{-}Normal}(0,0.25)\\
+    \beta_T &\sim \mathcal{N}(0,0.5)\\
+    \beta_F &\sim \mathcal{N}(0,0.5)\\
+    \sigma &\sim \mathrm{Exponential}(1)
+    \end{aligned}
+
+    The proportion of growth p is now a function of the predictor variables. The priors on the slopes are almost certainly too flat. They place 95% of the prior mass between −1 (100% reduction) and +1 (100% increase) and two-thirds of the prior mass between −0.5 and +0.5.
+    """)
+    return
+
+
+app._unparsable_cell(
+    r"""
+    def run_fungus_model() -> az.InferenceData:
+    
+    """,
+    name="_"
+)
 
 
 @app.cell
