@@ -67,6 +67,7 @@ def _():
         np,
         pl,
         plt,
+        pm,
         remove_period_col_name,
         rng,
         run_linear_model,
@@ -351,13 +352,53 @@ def _(mo):
     return
 
 
-app._unparsable_cell(
-    r"""
+@app.cell
+def _(az, np, pm, rng):
     def run_fungus_model() -> az.InferenceData:
-    
-    """,
-    name="_"
-)
+        n = 1000
+        h0 = rng.normal(10, 2, size=n)
+        treatment = np.repeat([0, 1], n / 2)
+        fungus = rng.binomial(n=1, p=0.5 - treatment * 0.4, size=n)
+        h1 = h0 + rng.normal(5 - 3 * fungus, size=n)
+
+        with pm.Model() as model:
+            a = pm.Normal("a", 0, 0.2)
+            bt = pm.Normal("treatment", 0, 0.5)
+            bf = pm.Normal("fungus", 0, 0.5)
+            sigma = pm.Exponential("sigma", 1)
+
+            p = a + bt*treatment + bf*fungus
+            mu = h0*p
+
+            h1_inference = pm.Normal("h1", mu, sigma, observed=h1)
+
+            idata = pm.sample()
+
+        return idata
+
+    return (run_fungus_model,)
+
+
+@app.cell
+def _(run_fungus_model):
+    fungus_model_wrong = run_fungus_model()
+    return (fungus_model_wrong,)
+
+
+@app.cell
+def _(az, fungus_model_wrong):
+    az.summary(fungus_model_wrong, kind="stats")
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell
+def _():
+    return
 
 
 @app.cell
