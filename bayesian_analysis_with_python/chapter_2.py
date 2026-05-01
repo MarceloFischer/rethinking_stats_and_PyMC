@@ -20,11 +20,12 @@ def _():
 
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
-    return
+    return (pz,)
 
 
 @app.cell
-def _():
+def _(pz):
+    pz.Normal(0, 1).plot_pdf()
     return
 
 
