@@ -20,12 +20,20 @@ def _():
 
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
-    return (pz,)
+    return (pm,)
 
 
 @app.cell
-def _(pz):
-    pz.Normal(0, 1).plot_pdf()
+def _(pm):
+    def shift_model():
+        with pm.Model() as model:
+            # Priors
+            mu = pm.Uniform("mu", 40, 75)
+            sigma = pm.HalfNormal("sigma", 5)
+
+            # Likelihood
+            obs = pm.Normal("obs", mu=mu, sigma=sigma)
+
     return
 
 
