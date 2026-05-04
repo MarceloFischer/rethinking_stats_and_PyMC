@@ -23,6 +23,7 @@ def _():
     import marimo as moe
     import numpy as np
     import polars as pl
+    import pandas as pd
     import pymc as pm
     import scipy.stats as stats
     from pathlib import Path
@@ -63,13 +64,13 @@ def _(mo):
 
 
 @app.cell
-def _(Path, pl):
+def _(Path, np, pl):
     TIPS_PATH = Path(__file__).parent.parent / "data" / "tips.csv"
+    CHEM_PATH = Path(__file__).parent.parent / "data" / "chemical_shifts.csv"
 
     tips = pl.read_csv(TIPS_PATH)
-
-    tips
-    return (tips,)
+    chem_data = np.genfromtxt(CHEM_PATH, delimiter=",", skip_header=0)
+    return chem_data, tips
 
 
 @app.cell(hide_code=True)
@@ -237,8 +238,8 @@ def _(day_idx, days, pm, rng, tips):
 
 
 @app.cell
-def _(day_tip_model):
-    day_tip_model
+def _(day_tip_idata):
+    day_tip_idata
     return
 
 
@@ -266,12 +267,6 @@ def _(RANDOM_SEED, az, day_tip_idata, day_tip_model, days, plt, pm):
 
 
 @app.cell
-def _(diffs):
-    diffs
-    return
-
-
-@app.cell
 def _(az, combinations, day_tip_idata, days):
     diffs = {}
     for day_1, day_2 in combinations(days, 2):
@@ -280,7 +275,7 @@ def _(az, combinations, day_tip_idata, days):
         ) - day_tip_idata.posterior["mu"].sel(days=day_2)
 
     az.plot_posterior(diffs, ref_val=0, figsize=(14, 7))
-    return (diffs,)
+    return
 
 
 @app.cell(column=2, hide_code=True)
@@ -427,7 +422,7 @@ def _(np, pl, plt):
     plt.plot(years, disaster_data, "o", markersize=8, alpha=0.4)
     plt.ylabel("Disaster count")
     plt.xlabel("Year")
-    return disaster_data, years
+    return
 
 
 @app.cell(hide_code=True)
@@ -459,57 +454,153 @@ def _(mo):
 
 
 @app.cell
-def _(disaster_data, pm, years):
-    with pm.Model() as disaster_model:
-        switchpoint = pm.DiscreteUniform("switchpoint", lower=years.min(), upper=years.max())
-        # priors
-        early_rate = pm.Exponential("early_rate", 1.0)
-        late_rate = pm.Exponential("late_rate", 1.0)
-        # Alocate appropriate Poisson rates to years before and after current
-        rate = pm.math.switch(switchpoint >= years, early_rate, late_rate)
+def _():
+    # with pm.Model() as disaster_model:
+    #     switchpoint = pm.DiscreteUniform("switchpoint", lower=years.min(), upper=years.max())
+    #     # priors
+    #     early_rate = pm.Exponential("early_rate", 1.0)
+    #     late_rate = pm.Exponential("late_rate", 1.0)
+    #     # Alocate appropriate Poisson rates to years before and after current
+    #     rate = pm.math.switch(switchpoint >= years, early_rate, late_rate)
 
-        disasters = pm.Poisson("disasters", rate, observed=disaster_data)
+    #     disasters = pm.Poisson("disasters", rate, observed=disaster_data)
 
-        disaster_idata = pm.sample(10000)
-    return (disaster_idata,)
-
-
-@app.cell
-def _(az, disaster_idata, plt):
-    _axes_arr = az.plot_trace(disaster_idata)
-    for _ax in _axes_arr.flatten():
-        if _ax.get_title() == "switchpoint":
-            _labels = [_label.get_text() for _label in _ax.get_xticklabels()]
-            _ax.set_xticklabels(_labels, rotation=45, ha="right")
-            break
-    plt.gca()
+    #     disaster_idata = pm.sample(10000)
     return
 
 
 @app.cell
-def _(az, disaster_data, disaster_idata, np, plt, years):
-    plt.figure(figsize=(10, 8))
-    plt.plot(years, disaster_data, ".", alpha=0.6)
-    plt.ylabel("Number of accidents", fontsize=16)
-    plt.xlabel("Year", fontsize=16)
+def _():
+    # _axes_arr = az.plot_trace(disaster_idata)
+    # for _ax in _axes_arr.flatten():
+    #     if _ax.get_title() == "switchpoint":
+    #         _labels = [_label.get_text() for _label in _ax.get_xticklabels()]
+    #         _ax.set_xticklabels(_labels, rotation=45, ha="right")
+    #         break
+    # plt.gca()
+    return
 
-    trace = disaster_idata.posterior.stack(draws=("chain", "draw"))
 
-    plt.vlines(trace["switchpoint"].mean(), disaster_data.min(), disaster_data.max(), color="C1")
-    average_disasters = np.zeros_like(disaster_data, dtype="float")
-    for i, year in enumerate(years):
-        idx = year < trace["switchpoint"]
-        average_disasters[i] = np.mean(np.where(idx, trace["early_rate"], trace["late_rate"]))
+@app.cell
+def _():
+    # plt.figure(figsize=(10, 8))
+    # plt.plot(years, disaster_data, ".", alpha=0.6)
+    # plt.ylabel("Number of accidents", fontsize=16)
+    # plt.xlabel("Year", fontsize=16)
 
-    sp_hpd = az.hdi(disaster_idata, var_names=["switchpoint"])["switchpoint"].values
-    plt.fill_betweenx(
-        y=[disaster_data.min(), disaster_data.max()],
-        x1=sp_hpd[0],
-        x2=sp_hpd[1],
-        alpha=0.5,
-        color="C1",
+    # trace = disaster_idata.posterior.stack(draws=("chain", "draw"))
+
+    # plt.vlines(trace["switchpoint"].mean(), disaster_data.min(), disaster_data.max(), color="C1")
+    # average_disasters = np.zeros_like(disaster_data, dtype="float")
+    # for i, year in enumerate(years):
+    #     idx = year < trace["switchpoint"]
+    #     average_disasters[i] = np.mean(np.where(idx, trace["early_rate"], trace["late_rate"]))
+
+    # sp_hpd = az.hdi(disaster_idata, var_names=["switchpoint"])["switchpoint"].values
+    # plt.fill_betweenx(
+    #     y=[disaster_data.min(), disaster_data.max()],
+    #     x1=sp_hpd[0],
+    #     x2=sp_hpd[1],
+    #     alpha=0.5,
+    #     color="C1",
+    # )
+    # plt.plot(years, average_disasters, "k--", lw=2)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercice 5
+    """)
+    return
+
+
+@app.cell
+def _(chem_data, pm):
+    def ex5_g():
+        idatas_g = []
+        sd_priors = [1.5, 3, 5, 1000]
+
+        for sd_prior in sd_priors:
+            with pm.Model() as model_g:
+                # priors
+                mu = pm.Normal(f"mu_{sd_prior}", mu=chem_data.mean(), sigma=sd_prior)
+                sigma = pm.HalfNormal("sigma", sigma=5)
+                # likelihood
+                chem_shifts = pm.Normal(
+                    "chem_shifts", mu=mu, sigma=sigma, observed=chem_data
+                )
+
+                idata_g = pm.sample(1000)
+                idatas_g.append(idata_g)
+
+        return model_g, idatas_g
+
+
+    # model_g_ex5, idatas_g_ex5 = ex5_g()
+    # summaries_ex5 = [az.summary(idata, kind="stats").round(2) for idata in idatas_g_ex5]
+    # pd.concat(summaries_ex5).T
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Looking at the summaries, the combination of the model and inference technique seems quite robust to the changes. Even with a prior that is 300x larger than the empirical prior, the posterior values converge to approximately the same result. Computationally there seems to be very little difference.
+
+    Logically, however, there could be some questions about the choice of an unbounded prior. Since it is not possible to get values below 0 or above 100, it doesn't make practical sense to have a prior that exists for those values.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercices 6 & 7
+    """)
+    return
+
+
+@app.cell
+def _(chem_data, np):
+    chem_mu_full, chem_std_full = chem_data.mean(), chem_data.std()
+    chem_mu_clean, chem_std_clean = (
+        chem_data[chem_data < 62].mean(),
+        chem_data[chem_data < 62].std(),
     )
-    plt.plot(years, average_disasters, "k--", lw=2)
+
+    chem_extra_outliers = np.append(chem_data, np.array([64, 72, 65.5]))
+
+    chem_mu_full, chem_std_full, chem_mu_clean, chem_std_clean
+    return (chem_extra_outliers,)
+
+
+@app.cell
+def _(az, chem_extra_outliers, np, pm, rng):
+    def ex7_g(obs_data: np.array):
+        with pm.Model() as model_g:
+            μ = pm.Uniform("μ", lower=40, upper=70, rng=rng)
+            σ = pm.HalfNormal("σ", sigma=5, rng=rng)
+            Y = pm.Normal("Y", mu=μ, sigma=σ, observed=obs_data, rng=rng)
+            idata_g = pm.sample(random_seed=rng)
+        return model_g, idata_g
+
+
+    def ex7_t(obs_data: np.array):
+        with pm.Model() as model_t:
+            μ = pm.Uniform("μ", 40, 75, rng=rng)
+            σ = pm.HalfNormal("σ", sigma=10, rng=rng)
+            ν = pm.Exponential("ν", 1 / 30, rng=rng)
+            y = pm.StudentT("y", nu=ν, mu=μ, sigma=σ, observed=obs_data, rng=rng)
+            idata_t = pm.sample(random_seed=rng)
+        return model_t, idata_t
+
+
+    model_g_ex7, idata_g_ex7 = ex7_g(chem_extra_outliers)
+    model_t_ex7, idata_t_ex7 = ex7_t(chem_extra_outliers)
+
+    az.summary(idata_g_ex7), az.summary(idata_t_ex7)
     return
 
 
