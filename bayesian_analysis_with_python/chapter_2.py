@@ -215,8 +215,8 @@ def _(day_idx, days, pm, rng, tips):
         coords = {"days": days, "days_flat": days[day_idx]}
         with pm.Model(coords=coords) as model:
             # priors
-            mu = pm.HalfNormal("mu", sigma=5, dims="days", rng=rng)
-            sigma = pm.HalfNormal("sigma", sigma=3, dims="days", rng=rng)
+            mu = pm.HalfNormal("mu", sigma=5, dims="days")
+            sigma = pm.HalfNormal("sigma", sigma=3, dims="days")
 
             # likelihood
             obs = pm.Normal(
@@ -303,9 +303,9 @@ def _(pm, pz, rng):
 
         with pm.Model() as our_first_model:
             # prior
-            theta = pm.Beta("theta", alpha=alpha, beta=beta, rng=rng)
+            theta = pm.Beta("theta", alpha=alpha, beta=beta)
             # likelihood
-            obs = pm.Bernoulli("obs", p=theta, observed=data, rng=rng)
+            obs = pm.Bernoulli("obs", p=theta, observed=data)
 
             idata = pm.sample(random_seed=rng)
 
@@ -375,9 +375,9 @@ def _(pm, pz, rng):
 
         with pm.Model() as our_first_model:
             # prior
-            theta = pm.Uniform("theta", lower=lower, upper=upper, rng=rng)
+            theta = pm.Uniform("theta", lower=lower, upper=upper)
             # likelihood
-            obs = pm.Bernoulli("obs", p=theta, observed=data, rng=rng)
+            obs = pm.Bernoulli("obs", p=theta, observed=data)
 
             idata = pm.sample(random_seed=rng)
 
@@ -580,19 +580,19 @@ def _(chem_data, np):
 def _(az, chem_extra_outliers, np, pm, rng):
     def ex7_g(obs_data: np.array):
         with pm.Model() as model_g:
-            μ = pm.Uniform("μ", lower=40, upper=70, rng=rng)
-            σ = pm.HalfNormal("σ", sigma=5, rng=rng)
-            Y = pm.Normal("Y", mu=μ, sigma=σ, observed=obs_data, rng=rng)
+            μ = pm.Uniform("μ", lower=40, upper=70)
+            σ = pm.HalfNormal("σ", sigma=5)
+            Y = pm.Normal("Y", mu=μ, sigma=σ, observed=obs_data)
             idata_g = pm.sample(random_seed=rng)
         return model_g, idata_g
 
 
     def ex7_t(obs_data: np.array):
         with pm.Model() as model_t:
-            μ = pm.Uniform("μ", 40, 75, rng=rng)
-            σ = pm.HalfNormal("σ", sigma=10, rng=rng)
-            ν = pm.Exponential("ν", 1 / 30, rng=rng)
-            y = pm.StudentT("y", nu=ν, mu=μ, sigma=σ, observed=obs_data, rng=rng)
+            μ = pm.Uniform("μ", 40, 75)
+            σ = pm.HalfNormal("σ", sigma=10)
+            ν = pm.Exponential("ν", 1 / 30)
+            y = pm.StudentT("y", nu=ν, mu=μ, sigma=σ, observed=obs_data)
             idata_t = pm.sample(random_seed=rng)
         return model_t, idata_t
 
