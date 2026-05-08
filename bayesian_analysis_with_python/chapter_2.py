@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.4"
+__generated_with = "0.23.5"
 app = marimo.App(width="columns")
 
 
@@ -235,6 +235,12 @@ def _(day_idx, days, pm, rng, tips):
 
     day_tip_model, day_tip_idata = tips_model()
     return day_tip_idata, day_tip_model
+
+
+@app.cell
+def _(az, day_tip_idata):
+    az.plot_forest(day_tip_idata, var_names=['mu'], combined=True), az.summary(day_tip_idata, kind='stats').round(2)
+    return
 
 
 @app.cell
@@ -573,11 +579,11 @@ def _(chem_data, np):
     chem_extra_outliers = np.append(chem_data, np.array([64, 72, 65.5]))
 
     chem_mu_full, chem_std_full, chem_mu_clean, chem_std_clean
-    return (chem_extra_outliers,)
+    return
 
 
 @app.cell
-def _(az, chem_extra_outliers, np, pm, rng):
+def _(np, pm, rng):
     def ex7_g(obs_data: np.array):
         with pm.Model() as model_g:
             μ = pm.Uniform("μ", lower=40, upper=70)
@@ -597,10 +603,15 @@ def _(az, chem_extra_outliers, np, pm, rng):
         return model_t, idata_t
 
 
-    model_g_ex7, idata_g_ex7 = ex7_g(chem_extra_outliers)
-    model_t_ex7, idata_t_ex7 = ex7_t(chem_extra_outliers)
+    # model_g_ex7, idata_g_ex7 = ex7_g(chem_extra_outliers)
+    # model_t_ex7, idata_t_ex7 = ex7_t(chem_extra_outliers)
 
-    az.summary(idata_g_ex7), az.summary(idata_t_ex7)
+    # az.summary(idata_g_ex7), az.summary(idata_t_ex7)
+    return
+
+
+@app.cell
+def _():
     return
 
 
