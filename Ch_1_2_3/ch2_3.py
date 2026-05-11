@@ -14,7 +14,7 @@
 
 import marimo
 
-__generated_with = "0.19.5"
+__generated_with = "0.23.5"
 app = marimo.App(width="columns")
 
 
@@ -35,6 +35,7 @@ def _():
     import numpy as np
     import polars as pl
     from scipy.stats import binom
+
     return alt, az, binom, mo, np, pl, plt
 
 
@@ -161,6 +162,7 @@ def _(alt, binom, np, pl):
             .interactive()
         )
         return df, chart
+
     return (grid_approx_ch2,)
 
 
