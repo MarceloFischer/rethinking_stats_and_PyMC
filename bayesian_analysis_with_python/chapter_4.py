@@ -44,8 +44,10 @@ def _(Path, pl):
 
     bikes = pl.read_csv(BIKE_PATH)
 
+    bikes_temp_sort_idx = bikes["temperature"].arg_sort()
+
     bikes.plot.point(x="temperature", y="rented").properties(width="container")
-    return (bikes,)
+    return bikes, bikes_temp_sort_idx
 
 
 @app.cell
@@ -71,8 +73,8 @@ def _(bikes, pm, rng):
         return bikes_linear, idata
 
 
-    bikes_model, bikes_idata = fn_bikes_linear_model()
-    return bikes_idata, bikes_model
+    bikes_lin_model, bikes_idata = fn_bikes_linear_model()
+    return bikes_idata, bikes_lin_model
 
 
 @app.cell
@@ -192,21 +194,21 @@ def _(plot_bikes_posterior_lines):
 
 
 @app.cell
-def _(bikes_idata, bikes_model, pm, rng):
+def _(bikes_idata, bikes_lin_model, pm, rng):
     pm.sample_posterior_predictive(
-        trace=bikes_idata, model=bikes_model, extend_inferencedata=True, random_seed=rng
+        trace=bikes_idata, model=bikes_lin_model, extend_inferencedata=True, random_seed=rng
     )
     return
 
 
 @app.cell
-def _(az, bikes, bikes_idata, plt):
+def _(az, bikes, bikes_idata, bikes_temp_sort_idx, plt):
     plt.scatter(x=bikes["temperature"], y=bikes["rented"], alpha=0.3, label="Observed")
 
     # plot mean line
     plt.plot(
-        bikes["temperature"],
-        bikes_idata["posterior"]["μ"].mean(("chain", "draw")),
+        bikes["temperature"][bikes_temp_sort_idx],
+        bikes_idata["posterior"]["μ"].mean(("chain", "draw"))[bikes_temp_sort_idx],
         c="r",
         lw=5,
         label="Posterior Mean",
@@ -241,32 +243,70 @@ def _(mo):
 
 
 @app.cell
-def _():
+def _(bikes, pm, rng):
+    def fn_bikes_neg_binom__model():
+        with pm.Model() as neg_binom_model:
+            # Priors
+            α = pm.Normal("α", mu=0, sigma=1)
+            β = pm.Normal("β", mu=0, sigma=5)
+            σ = pm.HalfNormal("σ", sigma=10)
+            # Mean
+            μ = pm.Deterministic("μ", pm.math.exp(α + β * bikes["temperature"].to_numpy()))
+            # Likelihood
+            y_pred = pm.NegativeBinomial("y_pred", mu=μ, alpha=σ, observed=bikes["rented"])
+
+            idata = pm.sample(random_seed=rng)
+            pm.sample_posterior_predictive(
+                idata, extend_inferencedata=True, random_seed=rng
+            )
+
+        return neg_binom_model, idata
+
+    return (fn_bikes_neg_binom__model,)
+
+
+@app.cell
+def _(fn_bikes_neg_binom__model):
+    bikes_neg_binom_model, bikes_neg_binom_idata = fn_bikes_neg_binom__model()
+    return (bikes_neg_binom_idata,)
+
+
+@app.cell
+def _(az, bikes, bikes_neg_binom_idata, bikes_temp_sort_idx, plt):
+    # _x_plot = np.linspace()
+    plt.scatter(bikes["temperature"], bikes["rented"])
+
+    plt.plot(
+        bikes["temperature"][bikes_temp_sort_idx],
+        bikes_neg_binom_idata["posterior"]["μ"].mean(("chain", "draw"))[
+            bikes_temp_sort_idx
+        ],
+    )
+
+    # for _hdi_prob in [0.5, 0.89]:
+    az.plot_hdi(
+        bikes["temperature"],
+        bikes_neg_binom_idata["posterior_predictive"]["y_pred"],
+        color="green",
+        hdi_prob=0.94,
+    )
+    plt.gca()
     return
 
 
 @app.cell
-def _():
+def _(az, bikes_neg_binom_idata):
+    # az.summary(bikes_neg_binom_idata, var_names=['~μ'], kind='stats').round(3)
+    az.plot_trace(bikes_neg_binom_idata, var_names=["~μ"])
     return
 
 
 @app.cell
-def _():
-    return
-
-
-@app.cell
-def _():
-    return
-
-
-@app.cell
-def _():
-    return
-
-
-@app.cell
-def _():
+def _(az, bikes_idata, bikes_neg_binom_idata):
+    (
+        az.plot_ppc(bikes_idata, num_pp_samples=200),
+        az.plot_ppc(bikes_neg_binom_idata, num_pp_samples=200),
+    )
     return
 
 
