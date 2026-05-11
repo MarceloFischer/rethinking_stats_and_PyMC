@@ -7,6 +7,7 @@ app = marimo.App(width="columns")
 @app.cell(column=0)
 def _():
     import marimo as mo
+    from itertools import combinations
     import numpy as np
     import polars as pl
     import matplotlib.pyplot as plt
@@ -25,7 +26,7 @@ def _():
     plt.rcParams["figure.autolayout"] = True
     # sets default credible interval used by arviz
     az.rcParams["stats.ci_prob"] = 0.89
-    return Path, RANDOM_SEED, az, mo, pl, plt, pm, rng
+    return Path, mo, pl, pm, rng
 
 
 @app.cell
@@ -64,6 +65,12 @@ def _(mo):
     mo.md(r"""
     # Chemical Shift Hierarchical Model
     """)
+    return
+
+
+@app.cell
+def _(cs_data):
+    cs_data
     return
 
 
@@ -115,24 +122,29 @@ def _(aa_cats, aa_idx, cs_data, pm, rng):
             idata = pm.sample(random_seed=rng)
         return cs_h_model, idata
 
-    return fn_cs_h_model, fn_cs_nh_model
+    return
 
 
 @app.cell
-def _(az, fn_cs_h_model, fn_cs_nh_model):
-    cs_nh_model, cs_nh_idata = fn_cs_nh_model()
-    cs_h_model, cs_h_idata = fn_cs_h_model()
+def _():
+    # cs_nh_model, cs_nh_idata = fn_cs_nh_model()
+    # cs_h_model, cs_h_idata = fn_cs_h_model()
 
-    _axes = az.plot_forest(
-        [cs_nh_idata, cs_h_idata],
-        model_names=["non-hierarchical", "hierarchical"],
-        var_names="mu",
-        combined=True,
-        figsize=(14, 7),
-    )
+    # _axes = az.plot_forest(
+    #     [cs_nh_idata, cs_h_idata],
+    #     model_names=["non-hierarchical", "hierarchical"],
+    #     var_names="mu",
+    #     combined=True,
+    #     figsize=(14, 7),
+    # )
 
-    y_lims = _axes[0].get_ylim()
-    _axes[0].vlines(cs_h_idata.posterior["mu_global"].mean(), *y_lims, color="k", ls=":")
+    # y_lims = _axes[0].get_ylim()
+    # _axes[0].vlines(cs_h_idata.posterior["mu_global"].mean(), *y_lims, color="k", ls=":")
+    return
+
+
+@app.cell
+def _():
     return
 
 
@@ -187,28 +199,28 @@ def _(fb_data, pm, pos_cats, pos_idx, rng):
 
         return fb_model, idata
 
-    return (fn_fb_h_model,)
+    return
 
 
 @app.cell
-def _(az, fn_fb_h_model, plt):
-    fb_h_model, fb_h_idata = fn_fb_h_model()
+def _():
+    # fb_h_model, fb_h_idata = fn_fb_h_model()
 
-    _, _axes = plt.subplots(3, 1, figsize=(14, 7.5), sharex=True)
-    az.plot_posterior(fb_h_idata, var_names=["mu"], ax=_axes[0])
-    az.plot_posterior(
-        fb_h_idata.posterior.sel(pos_cats="FW"), var_names=["mu_p"], ax=_axes[1]
-    )
-    az.plot_posterior(fb_h_idata.posterior.sel(p_dim_0=1457), var_names=["p"], ax=_axes[2])
-    _axes[0].set_title("Global Mean")
-    _axes[1].set_title("FW Pos Mean")
-    _axes[2].set_title("Messi Mean")
-    return (fb_h_idata,)
+    # _, _axes = plt.subplots(3, 1, figsize=(14, 7.5), sharex=True)
+    # az.plot_posterior(fb_h_idata, var_names=["mu"], ax=_axes[0])
+    # az.plot_posterior(
+    #     fb_h_idata.posterior.sel(pos_cats="FW"), var_names=["mu_p"], ax=_axes[1]
+    # )
+    # az.plot_posterior(fb_h_idata.posterior.sel(p_dim_0=1457), var_names=["p"], ax=_axes[2])
+    # _axes[0].set_title("Global Mean")
+    # _axes[1].set_title("FW Pos Mean")
+    # _axes[2].set_title("Messi Mean")
+    return
 
 
 @app.cell
-def _(az, fb_h_idata):
-    az.plot_forest(fb_h_idata, var_names=["mu_p"], combined=True)
+def _():
+    # az.plot_forest(fb_h_idata, var_names=["mu_p"], combined=True)
     return
 
 
@@ -250,33 +262,41 @@ def _(Path, code_cat_vars, pl, pm, rng):
         return tips_h_model, idata
 
 
-    tips_h_model, tips_h_idata = fn_tips_h_model()
-    return days, tips_h_idata, tips_h_model
+    # tips_h_model, tips_h_idata = fn_tips_h_model()
+    # with tips_h_model:
+    #     tips_h_idata.extend(pm.sample_posterior_predictive(tips_h_idata))
 
-
-@app.cell
-def _(az, tips_h_idata):
-    (
-        az.plot_forest(tips_h_idata, var_names=["mu", "mu_t"], combined=True),
-        az.summary(tips_h_idata, kind="stats").round(2),
-    )
+    # (
+    #     az.plot_forest(tips_h_idata, var_names=["mu", "mu_t"], combined=True),
+    #     az.summary(tips_h_idata, kind="stats").round(2),
+    # )
     return
 
 
 @app.cell
-def _(RANDOM_SEED, az, days, plt, pm, tips_h_idata, tips_h_model):
-    with tips_h_model:
-        tips_h_idata.extend(pm.sample_posterior_predictive(tips_h_idata))
+def _():
+    # _, axes = plt.subplots(2, 2)
+    # az.plot_ppc(
+    #     tips_h_idata,
+    #     num_pp_samples=100,
+    #     coords={"days_flat": days},
+    #     flatten=[],
+    #     ax=axes,
+    #     random_seed=RANDOM_SEED,
+    # )
+    return
 
-    _, axes = plt.subplots(2, 2)
-    az.plot_ppc(
-        tips_h_idata,
-        num_pp_samples=100,
-        coords={"days_flat": days},
-        flatten=[],
-        ax=axes,
-        random_seed=RANDOM_SEED,
-    )
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Exercise 5
+    """)
+    return
+
+
+@app.cell
+def _():
     return
 
 
