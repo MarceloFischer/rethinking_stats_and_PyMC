@@ -1,3 +1,23 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "altair==6.1.0",
+#     "arviz==1.1.0",
+#     "marimo>=0.23.6",
+#     "matplotlib==3.10.9",
+#     "numpy==2.4.5",
+#     "openai==2.37.0",
+#     "polars==1.40.1",
+#     "preliz==0.25.0",
+#     "pymc==6.0.0",
+#     "pytest==9.0.3",
+#     "ruff==0.15.13",
+#     "vegafusion==2.0.3",
+#     "vl-convert-python==1.9.0.post1",
+#     "xarray==2026.4.0",
+# ]
+# ///
+
 import marimo
 
 __generated_with = "0.23.6"
@@ -12,6 +32,7 @@ def _():
     import xarray as xr
     import polars as pl
     import matplotlib.pyplot as plt
+    import altair as alt
     import pymc as pm
     import arviz as az
     import preliz as pz
@@ -215,13 +236,13 @@ def _(bikes, np, pm, rng):
 
         return neg_binom_model, idata
 
-    return (fn_bikes_neg_binom__model,)
+    bikes_neg_binom_model, bikes_neg_binom_idata = fn_bikes_neg_binom__model()
+    return (bikes_neg_binom_idata,)
 
 
 @app.cell
-def _(fn_bikes_neg_binom__model):
-    bikes_neg_binom_model, bikes_neg_binom_idata = fn_bikes_neg_binom__model()
-    return (bikes_neg_binom_idata,)
+def _():
+    return
 
 
 @app.cell
@@ -416,6 +437,93 @@ def _(az, babies_idata, babies_model, plt, pm, rng):
     az.add_lines(_pc, _ref_vals)
 
     plt.gca()
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell(column=4, hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Exercises
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercise 1
+    """)
+    return
+
+
+@app.cell
+def _(Path, np, pl):
+    HOWELL_PATH = Path(__file__).parent.parent / "data" / "howell.csv"
+
+    howell = pl.read_csv(HOWELL_PATH, separator=';')
+
+    h_adults = howell.filter(pl.col('age')>=18)
+
+    howell_coords = {'obs_idx': np.arange(len(howell))}
+    adults_howell_coords = {'obs_idx': np.arange(len(h_adults))}
+    return adults_howell_coords, h_adults
+
+
+@app.cell
+def _(h_adults):
+    h_adults.plot.point(x='height', y='weight').properties(width='container')
+    return
+
+
+@app.cell
+def _(adults_howell_coords, h_adults, pm, rng):
+    def fn_howell_adults_linear_model():
+        with pm.Model(coords=adults_howell_coords) as adults_linear:
+            # heights
+            height = pm.Data('height', h_adults['height'].to_numpy(), dims='obs_idx')
+            # Priors
+            α = pm.Normal('α', mu=0, sigma=10)
+            β = pm.HalfNormal('β', sigma=0.3)
+            σ = pm.HalfNormal('σ', sigma=15)
+            # mean
+            μ = pm.Deterministic('μ', α + β * height)
+            # likelihood
+            weight = pm.Normal('weight', mu=μ, sigma=σ, observed=h_adults['weight'], dims='obs_idx')
+            # sampling
+            idata = pm.sample(random_seed=rng)
+            pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
+        return adults_linear, idata
+
+    howell_adults_model, howell_adults_idata = fn_howell_adults_linear_model()
+    return (howell_adults_idata,)
+
+
+@app.cell
+def _(az, howell_adults_idata):
+    # az.plot_dist(howell_adults_idata, var_names=['~μ'], col_wrap=1)
+    az.plot_trace_dist(howell_adults_idata, var_names=['~μ'], figure_kwargs={"figsize":(18, 8)})
+    return
+
+
+@app.cell
+def _(az, howell_adults_idata):
+    az.plot_lm(howell_adults_idata)
+    return
+
+
+@app.cell
+def _(az, howell_adults_idata):
+    az.plot_ppc_dist(howell_adults_idata)
+    return
+
+
+@app.cell
+def _():
     return
 
 
