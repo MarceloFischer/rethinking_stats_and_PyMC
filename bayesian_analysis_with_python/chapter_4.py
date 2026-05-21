@@ -456,7 +456,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Exercise 1
+    ## Exercise 1 and 2
     """)
     return
 
@@ -466,12 +466,15 @@ def _(Path, np, pl):
     HOWELL_PATH = Path(__file__).parent.parent / "data" / "howell.csv"
 
     howell = pl.read_csv(HOWELL_PATH, separator=';')
+    howell_mean_height = howell['height'].mean()
+    # howell = howell.with_columns(height_c=pl.col('height') - pl.col('height').mean())
 
     h_adults = howell.filter(pl.col('age')>=18)
+    h_adults_mean_height = h_adults['height'].mean()
 
     howell_coords = {'obs_idx': np.arange(len(howell))}
     adults_howell_coords = {'obs_idx': np.arange(len(h_adults))}
-    return adults_howell_coords, h_adults
+    return adults_howell_coords, h_adults, h_adults_mean_height
 
 
 @app.cell
@@ -481,17 +484,17 @@ def _(h_adults):
 
 
 @app.cell
-def _(adults_howell_coords, h_adults, pm, rng):
+def _(adults_howell_coords, h_adults, h_adults_mean_height, pm, rng):
     def fn_howell_adults_linear_model():
         with pm.Model(coords=adults_howell_coords) as adults_linear:
             # heights
             height = pm.Data('height', h_adults['height'].to_numpy(), dims='obs_idx')
             # Priors
-            α = pm.Normal('α', mu=0, sigma=10)
-            β = pm.HalfNormal('β', sigma=0.3)
+            α = pm.Normal('α', mu=60, sigma=15)
+            β = pm.HalfNormal('β', sigma=5)
             σ = pm.HalfNormal('σ', sigma=15)
             # mean
-            μ = pm.Deterministic('μ', α + β * height)
+            μ = pm.Deterministic('μ', α + β * (height - h_adults_mean_height))
             # likelihood
             weight = pm.Normal('weight', mu=μ, sigma=σ, observed=h_adults['weight'], dims='obs_idx')
             # sampling
@@ -500,7 +503,7 @@ def _(adults_howell_coords, h_adults, pm, rng):
         return adults_linear, idata
 
     howell_adults_model, howell_adults_idata = fn_howell_adults_linear_model()
-    return (howell_adults_idata,)
+    return howell_adults_idata, howell_adults_model
 
 
 @app.cell
@@ -523,7 +526,58 @@ def _(az, howell_adults_idata):
 
 
 @app.cell
-def _():
+def _(az, howell_adults_idata, howell_adults_model, np, pm, rng):
+    with howell_adults_model:
+        _new_heights = np.array([142.5, 155.3, 132, 150])
+        pm.set_data({'height': _new_heights}, coords={'obs_idx': range(len(_new_heights))})
+        _ppc = az.extract(
+            pm.sample_posterior_predictive(
+                howell_adults_idata,
+                random_seed=rng,
+                extend_inferencedata=True,
+                predictions=True
+            ),
+            group='predictions'
+        )
+
+    az.plot_dist(
+        howell_adults_idata,
+        group='predictions',
+        ci_prob=0.89,
+        labeller=az.labels.DimCoordLabeller(),
+        col_wrap=2,
+        figure_kwargs={'figsize':(14, 5)}
+    )
+
+    # The below is to match the answer from the book. The new Arviz version is fucking my life as the old one was much easiert to work with because of the plt arguments (ax, ...)
+
+    # _pred_weight = howell_adults_idata.predictions["weight"]
+
+    # _fig_overlay, _ax_overlay = plt.subplots(figsize=(10, 6))
+
+    # for _obs in _pred_weight.coords["obs_idx"].values:
+    #     _samples = _pred_weight.sel(obs_idx=_obs).stack(_sample=("chain", "draw")).to_numpy()
+    #     _density, _edges = np.histogram(_samples, bins=70, density=True)
+    #     _centers = 0.5 * (_edges[:-1] + _edges[1:])
+    #     _ax_overlay.plot(_centers, _density, lw=2, label=str(_obs))
+
+    # _ax_overlay.set_title("Posterior predictive distributions (all heights)")
+    # _ax_overlay.set_xlabel("Predicted weight (kg)")
+    # _ax_overlay.set_ylabel("Density")
+    # _ax_overlay.legend(title="obs_idx")
+    # plt.gca()
+    return
+
+
+@app.cell
+def _(howell_adults_idata):
+    howell_adults_idata
+    return
+
+
+@app.cell
+def _(h_adults_mean_height, howell_adults_idata, np):
+    howell_adults_idata.posterior.α.mean().values + howell_adults_idata.posterior.β.mean().values * (np.array([142.5, 155.3, 132, 150]) - h_adults_mean_height)
     return
 
 
