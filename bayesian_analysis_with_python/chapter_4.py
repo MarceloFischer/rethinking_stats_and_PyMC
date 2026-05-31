@@ -6,12 +6,12 @@
 #     "marimo>=0.23.6",
 #     "matplotlib==3.10.9",
 #     "numpy==2.4.5",
-#     "openai==2.37.0",
+#     "openai==2.38.0",
 #     "polars==1.40.1",
 #     "preliz==0.25.0",
 #     "pymc==6.0.0",
 #     "pytest==9.0.3",
-#     "ruff==0.15.13",
+#     "ruff==0.15.15",
 #     "vegafusion==2.0.3",
 #     "vl-convert-python==1.9.0.post1",
 #     "xarray==2026.4.0",
@@ -20,13 +20,13 @@
 
 import marimo
 
-__generated_with = "0.23.6"
+__generated_with = "0.23.8"
 app = marimo.App(width="columns")
 
 
-@app.cell(column=0)
-def _():
-    import marimo as mo
+app._unparsable_cell(
+    r"""
+    >import marimo as mo
     from itertools import combinations
     import numpy as np
     import xarray as xr
@@ -41,13 +41,21 @@ def _():
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
 
+    alt.theme.enable('fivethirtyeight')
     # az.style.use("arviz-variat")
     plt.style.use("fivethirtyeight")
     # Set default figure size to 14 inches wide by 7 inches tall
     plt.rcParams["figure.figsize"] = (14, 7)
     # Make the layout "tight" by deffault so labels don't overlap
     plt.rcParams["figure.autolayout"] = True
-    return Path, az, mo, np, pl, plt, pm, rng, xr
+    """,
+    column=0, disabled=False, hide_code=False, name="_"
+)
+
+
+@app.cell
+def _():
+    return
 
 
 @app.cell(column=1, hide_code=True)
@@ -77,7 +85,7 @@ def _():
 
 
 @app.cell
-def _(bikes, np, pm, rng):
+def _(az, bikes, np, pm, rng):
     def fn_bikes_linear_model():
         coords = {"obs_id": np.arange(len(bikes))}
         with pm.Model(coords=coords) as bikes_linear:
@@ -98,13 +106,9 @@ def _(bikes, np, pm, rng):
 
 
     bikes_lin_model, bikes_idata = fn_bikes_linear_model()
-    return bikes_idata, bikes_lin_model
 
-
-@app.cell
-def _(az, bikes_idata):
     az.plot_dist(bikes_idata, var_names=["~μ"], figure_kwargs={"figsize": (14, 5)})
-    return
+    return bikes_idata, bikes_lin_model
 
 
 @app.cell
@@ -400,12 +404,8 @@ def _(az, babies, babies_idata, plt):
     σ_m = posterior["σ"].mean("sample").values
 
     axes[0].plot(babies["month"], μ_m, c="k")
-    axes[0].fill_between(
-        babies["month"], μ_m + 1 * σ_m, μ_m - 1 * σ_m, alpha=0.6, color="C1"
-    )
-    axes[0].fill_between(
-        babies["month"], μ_m + 2 * σ_m, μ_m - 2 * σ_m, alpha=0.4, color="C1"
-    )
+    axes[0].fill_between(babies["month"], μ_m + 1 * σ_m, μ_m - 1 * σ_m, alpha=0.6, color="C1")
+    axes[0].fill_between(babies["month"], μ_m + 2 * σ_m, μ_m - 2 * σ_m, alpha=0.4, color="C1")
 
     axes[0].set_xlabel("months")
     axes[0].set_ylabel("length")
@@ -453,33 +453,63 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Exercise 1 and 2
-    """)
-    return
-
-
 @app.cell
 def _(Path, np, pl):
     HOWELL_PATH = Path(__file__).parent.parent / "data" / "howell.csv"
 
     howell = pl.read_csv(HOWELL_PATH, separator=';')
     howell_mean_height = howell['height'].mean()
-    # howell = howell.with_columns(height_c=pl.col('height') - pl.col('height').mean())
+    howell = howell.with_columns(
+        height_c = pl.col('height') - pl.col('height').mean(),
+        height_std = (pl.col('height') - pl.col('height').mean()) / (pl.col('height').std()),
+        over_17 = pl.col('age') >= 18
+    )
 
     h_adults = howell.filter(pl.col('age')>=18)
     h_adults_mean_height = h_adults['height'].mean()
 
     howell_coords = {'obs_idx': np.arange(len(howell))}
     adults_howell_coords = {'obs_idx': np.arange(len(h_adults))}
-    return adults_howell_coords, h_adults, h_adults_mean_height
+
+    ###########
+    ##  Iris ##
+    ###########
+
+    IRIS_PATH = Path(__file__).parent.parent / "data" / "iris.csv"
+    iris = pl.read_csv(IRIS_PATH)
+
+    iris_coords = {'obs_idx': np.arange(len(iris))}
+    return (
+        adults_howell_coords,
+        h_adults,
+        h_adults_mean_height,
+        howell,
+        howell_coords,
+        howell_mean_height,
+        iris,
+        iris_coords,
+    )
 
 
 @app.cell
-def _(h_adults):
-    h_adults.plot.point(x='height', y='weight').properties(width='container')
+def _(alt, howell, np):
+    howell.plot.point(
+        x=alt.X('height', title='Exp of Height', scale=alt.Scale(type='pow', exponent=np.e)),
+        y=alt.Y('weight'),
+        color='over_17',
+        tooltip=['height', 'weight', 'over_17']
+    ).properties(
+        width='container',
+        title='Exp of Height vs Weight'
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercises 1 and 2
+    """)
     return
 
 
@@ -530,15 +560,21 @@ def _(az, howell_adults_idata, howell_adults_model, np, pm, rng):
     with howell_adults_model:
         _new_heights = np.array([142.5, 155.3, 132, 150])
         pm.set_data({'height': _new_heights}, coords={'obs_idx': range(len(_new_heights))})
-        _ppc = az.extract(
-            pm.sample_posterior_predictive(
+        # _ppc = az.extract(
+        #     pm.sample_posterior_predictive(
+        #         howell_adults_idata,
+        #         random_seed=rng,
+        #         extend_inferencedata=True,
+        #         predictions=True
+        #     ),
+        #     group='predictions'
+        # )
+        pm.sample_posterior_predictive(
                 howell_adults_idata,
                 random_seed=rng,
                 extend_inferencedata=True,
                 predictions=True
-            ),
-            group='predictions'
-        )
+            )
 
     az.plot_dist(
         howell_adults_idata,
@@ -570,14 +606,228 @@ def _(az, howell_adults_idata, howell_adults_model, np, pm, rng):
 
 
 @app.cell
-def _(howell_adults_idata):
-    howell_adults_idata
+def _(h_adults_mean_height, howell_adults_idata, np):
+    howell_adults_idata.posterior.α.mean().values + howell_adults_idata.posterior.β.mean().values * (np.array([142.5, 155.3, 132, 150]) - h_adults_mean_height)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercise 3
+    """)
     return
 
 
 @app.cell
-def _(h_adults_mean_height, howell_adults_idata, np):
-    howell_adults_idata.posterior.α.mean().values + howell_adults_idata.posterior.β.mean().values * (np.array([142.5, 155.3, 132, 150]) - h_adults_mean_height)
+def _(howell, howell_coords, howell_mean_height, pm, rng):
+    def fn_howell_linear_model():
+        with pm.Model(coords=howell_coords) as howell_linear:
+            # heights
+            height = pm.Data('height', howell['height'].to_numpy(), dims='obs_idx')
+            # Priors
+            α = pm.Normal('α', mu=35, sigma=20)
+            β = pm.HalfNormal('β', sigma=5)
+            σ = pm.HalfNormal('σ', sigma=15)
+            # mean
+            μ = pm.Deterministic('μ', α + β * (height - howell_mean_height))
+            # likelihood
+            weight = pm.Normal('weight', mu=μ, sigma=σ, observed=howell['weight'], dims='obs_idx')
+            # sampling
+            idata = pm.sample(random_seed=rng)
+            pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
+        return howell_linear, idata
+
+    howell_model, howell_idata = fn_howell_linear_model()
+    return (howell_idata,)
+
+
+@app.cell
+def _(az, howell_idata):
+    # az.plot_dist(howell_idata, var_names=['~μ'], col_wrap=1)
+    az.plot_trace_dist(howell_idata, var_names=['~μ'], figure_kwargs={"figsize":(18, 8)})
+    return
+
+
+@app.cell
+def _(az, howell_idata):
+    az.plot_lm(howell_idata)
+    return
+
+
+@app.cell
+def _(az, howell_idata):
+    az.plot_ppc_dist(howell_idata)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercise 4
+    """)
+    return
+
+
+@app.cell
+def _(howell, howell_coords, pm, rng):
+    def fn_howell_linear_exp_model():
+        with pm.Model(coords=howell_coords) as howell_linear_exp:
+            # heights
+            height = pm.Data('height', howell['height'].to_numpy(), dims='obs_idx')
+            height_std = pm.Data('height_std', howell['height_std'].to_numpy(), dims='obs_idx')
+            # Priors
+            α = pm.Normal('α', mu=3.5, sigma=1)
+            β = pm.Normal('β', mu=0, sigma=0.5)
+            σ = pm.HalfNormal('σ', sigma=15)
+            # mean
+            # If log(weight) ~ height, then weight ~ exp(α + β * height)
+            # Also, if log(weight) ~ Normal(height) => weight ~ lognormal(height)
+            μ = pm.Deterministic('μ', pm.math.exp(α + β * height_std), dims='obs_idx')
+            # likelihood
+            weight = pm.Normal('weight', mu=μ, sigma=σ, observed=howell['weight'], dims='obs_idx')
+            # sampling
+            idata = pm.sample(random_seed=rng, target_accept=0.95)
+            pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
+        return howell_linear_exp, idata
+
+
+    def fn_howell_lognormal_model():
+        with pm.Model(coords=howell_coords) as model:
+            # Data
+            height = pm.Data('height', howell['height'].to_numpy(), dims='obs_idx') # for plotting
+            height_std = pm.Data("height_std", howell['height_std'].to_numpy(), dims='obs_idx')
+            # Priors
+            α = pm.Normal("α", mu=3.5, sigma=1)
+            β = pm.Normal("β", mu=0, sigma=0.5)
+            σ = pm.HalfNormal("σ", sigma=0.5)
+            # linear model
+            μ = pm.Deterministic('μ', α + β * height_std, dims='obs_idx')
+            # We expect the log(w) ~ Normal(a + b*h, sigma)
+            # Same as saying that the w ~ LogNormal(a + b*h, sigma)
+            weight = pm.LogNormal(
+                "weight",
+                mu=μ,
+                sigma=σ,
+                observed=howell["weight"],
+                dims='obs_idx'
+            )
+
+            idata = pm.sample(target_accept=0.9, random_seed=rng)
+            pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
+
+        return model, idata
+
+    howell_exp_model, howell_exp_idata = fn_howell_linear_exp_model()
+    howell_logN_model, howell_logN_idata = fn_howell_lognormal_model()
+    return howell_exp_idata, howell_logN_idata
+
+
+@app.cell
+def _(az, howell_exp_idata):
+    az.plot_trace_dist(
+        howell_exp_idata,
+        var_names=['~μ'],
+        figure_kwargs={'figsize':(14, 7)}
+    )
+    return
+
+
+@app.cell
+def _(az, howell_logN_idata):
+    az.plot_trace_dist(
+        howell_logN_idata,
+        var_names=['~μ'],
+        figure_kwargs={'figsize':(14, 7)}
+    )
+    return
+
+
+@app.cell
+def _(az, howell_exp_idata, howell_logN_idata):
+    az.plot_lm(howell_exp_idata), az.plot_lm(howell_logN_idata)
+
+    # The lognormal model looks more realistic as uncertainty increases with height.
+    return
+
+
+@app.cell
+def _(az, howell_exp_idata, howell_logN_idata):
+    az.plot_ppc_dist(howell_exp_idata), az.plot_ppc_dist(howell_logN_idata)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercise 6
+    """)
+    return
+
+
+@app.cell
+def _(iris, iris_coords, pl, pm, rng):
+    def iris_logit_model(predictor_cols: list[str], unique_species: list[str]=['setosa', 'versicolor']):
+        filtered_iris = iris.filter(pl.col('species').is_in(unique_species))
+        y = filtered_iris['species'].cast(pl.Enum(unique_species)).to_physical().to_numpy()
+
+        models = {}
+        for col in predictor_cols:
+            x = filtered_iris[col].to_numpy()
+            x_c = x - x.mean()
+
+            with pm.Model(coords=iris_coords) as model:
+                # data
+                pred_var = pm.Data(f'{predictor_cols}', x, dims='obx_idx')
+                pred_var_c = pm.Data(f'{predictor_cols}_c', x_c, dims='obx_idx')
+
+                # Priors
+                a = pm.Normal('a', mu=0, sigma=1)
+                b = pm.Normal('b', mu=0, sigma=3)
+
+                # Logistic Model
+                μ = a + pm.math.dot(pred_var_c, b)
+                θ = pm.Deterministic('θ', pm.math.sigmoid(μ))
+                bd = pm.Deterministic('bd', -a/b)
+
+                # Likelihood
+                y_pred = pm.Bernoulli('y_pred', p=θ, observed=y, dims='obx_idx')
+
+                #sampling
+                idata = pm.sample(random_seed=rng)
+                pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
+
+            models[f'model_{col}'] = idata
+        return models
+
+    iris_models = iris_logit_model(predictor_cols=['sepal_length', 'petal_length', 'petal_width'])
+    return (iris_models,)
+
+
+@app.cell
+def _(az, iris_models):
+    (
+        az.plot_lm(iris_models['model_sepal_length']),
+        az.plot_lm(iris_models['model_petal_length']),
+        az.plot_lm(iris_models['model_petal_width']),
+    )
+    return
+
+
+@app.cell
+def _(az, iris_models):
+    for model_name, idata in iris_models.items():
+        print(model_name)
+        print(az.summary(idata, var_names=['~θ']))
+        print('-'*50)
+    return
+
+
+@app.cell(column=5, hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercise 7
+    """)
     return
 
 
