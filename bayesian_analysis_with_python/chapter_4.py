@@ -24,9 +24,9 @@ __generated_with = "0.23.8"
 app = marimo.App(width="columns")
 
 
-app._unparsable_cell(
-    r"""
-    >import marimo as mo
+@app.cell(column=0)
+def _():
+    import marimo as mo
     from itertools import combinations
     import numpy as np
     import xarray as xr
@@ -48,9 +48,7 @@ app._unparsable_cell(
     plt.rcParams["figure.figsize"] = (14, 7)
     # Make the layout "tight" by deffault so labels don't overlap
     plt.rcParams["figure.autolayout"] = True
-    """,
-    column=0, disabled=False, hide_code=False, name="_"
-)
+    return Path, alt, az, mo, np, pl, plt, pm, rng, xr
 
 
 @app.cell
@@ -832,7 +830,64 @@ def _(mo):
 
 
 @app.cell
-def _():
+def _(Path, alt, pl):
+    POKEMON_PATH = Path(__file__).parent.parent / "data" / "Pokemon.csv"
+
+    pok = pl.read_csv(POKEMON_PATH)
+
+    pok.columns = [
+        col.lower().replace(". ", "_")
+        for col in pok.columns
+    ]
+
+    pok_target_col = 'sp_atk'
+
+    pok = pok.with_columns(
+        ((pl.col(pok_target_col) - pl.col(pok_target_col).mean()) / (pl.col(pok_target_col).std())).alias(f'{pok_target_col}_std')
+    )
+
+    pok.plot.point(
+        x=alt.X(pok_target_col),
+        y=alt.Y('attack')
+    ).properties(
+        width='container'
+    )
+    return pok, pok_target_col
+
+
+@app.cell
+def _(np, pm, pok, pok_target_col, rng):
+    def fn_pokemon_linear():
+        coords = {'obs_idx': np.arange(len(pok))}
+        with pm.Model(coords=coords) as model:
+            # data
+            defe = pm.Data(f'{pok_target_col}', pok[pok_target_col].to_numpy(), dims='obs_idx')
+            defe_std = pm.Data(f'{pok_target_col}_std', pok[f'{pok_target_col}_std'].to_numpy(), dims='obs_idx')
+            # Priors
+            α = pm.Normal('α', mu=0, sigma=1)
+            β = pm.Normal('β', mu=0, sigma=10)
+            σ = pm.HalfNormal('σ', sigma=5)
+            # Linear Model
+            μ = pm.Deterministic('μ', α + pm.math.dot(defe_std, β))
+            # likelihood
+            atk = pm.Normal('atk', mu=μ, sigma=σ, observed=pok['attack'], dims='obs_idx')
+            idata = pm.sample(random_seed=rng)
+            pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
+        return model, idata
+
+    pok_model, pok_idata = fn_pokemon_linear()
+    return (pok_idata,)
+
+
+@app.cell
+def _(az, pok_idata):
+    az.summary(pok_idata, kind='stats', var_names=['~μ']), az.plot_trace_dist(pok_idata, var_names=['~μ'])
+    return
+
+
+@app.cell
+def _(az, pok_idata):
+    az.plot_lm(pok_idata)
     return
 
 
