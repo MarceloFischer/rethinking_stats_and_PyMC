@@ -18,7 +18,7 @@
 
 import marimo
 
-__generated_with = "0.23.3"
+__generated_with = "0.23.9"
 app = marimo.App(width="columns")
 
 
@@ -34,6 +34,7 @@ def _(mo):
 def _():
     import altair as alt
     import arviz as az
+    import preliz as pz
     import hvplot.polars
     import seaborn as sns
     import matplotlib.pyplot as plt
@@ -68,6 +69,7 @@ def _():
         pl,
         plt,
         pm,
+        pz,
         remove_period_col_name,
         rng,
         run_linear_model,
@@ -79,7 +81,8 @@ def _():
 
 
 @app.cell
-def _(az, plt):
+def _(alt, az, plt):
+    alt.themes.enable('fivethirtyeight')
     plt.style.use("fivethirtyeight")
 
     # Set default figure size to 14 inches wide by 5 inches tall
@@ -261,12 +264,12 @@ def _(milk_data, run_linear_model):
 def _(az, fat_model, lactose_fat_model, lactose_model):
     # az.summary(fat_model, kind="stats"), az.summary(lactose_model, kind="stats"), az.summary(lactose_fat_model, kind="stats")
     az.plot_forest(
-        [fat_model, lactose_model, lactose_fat_model],
-        model_names=["fat", "lactose", "both"],
+        {'fat': fat_model, 'lactose': lactose_model, 'both': lactose_fat_model},
         var_names=["beta"],
         combined=True,
-        figsize=(11, 5),
+        figure_kwargs={'figsize':(14, 7)},
     )
+    # plt.legend()
     return
 
 
@@ -324,11 +327,14 @@ def _(mo):
 
 
 @app.cell
-def _(az, rng):
+def _(az, pz, rng):
     (
-        az.summary(rng.lognormal(0, 0.25, 1000), kind="stats"),
-        az.plot_dist(rng.lognormal(0, 0.25, 1000)),
+        az.summary(rng.lognormal(0, 0.25, (1, 1000)), kind="stats"),
+        pz.LogNormal(mu=0, sigma=0.25).plot_pdf(pointinterval=True, levels=[0.91])
+    #     az.plot_dist(rng.lognormal(0, 0.25, 1000)),
     )
+
+
     return
 
 
