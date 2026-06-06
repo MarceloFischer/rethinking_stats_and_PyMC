@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.5"
+__generated_with = "0.23.8"
 app = marimo.App(width="columns")
 
 
@@ -26,7 +26,7 @@ def _():
     plt.rcParams["figure.autolayout"] = True
     # sets default credible interval used by arviz
     az.rcParams["stats.ci_prob"] = 0.89
-    return Path, mo, pl, pm, rng
+    return Path, az, mo, pl, pm, rng
 
 
 @app.cell
@@ -122,24 +122,24 @@ def _(aa_cats, aa_idx, cs_data, pm, rng):
             idata = pm.sample(random_seed=rng)
         return cs_h_model, idata
 
-    return
+    return fn_cs_h_model, fn_cs_nh_model
 
 
 @app.cell
-def _():
-    # cs_nh_model, cs_nh_idata = fn_cs_nh_model()
-    # cs_h_model, cs_h_idata = fn_cs_h_model()
+def _(az, fn_cs_h_model, fn_cs_nh_model):
+    cs_nh_model, cs_nh_idata = fn_cs_nh_model()
+    cs_h_model, cs_h_idata = fn_cs_h_model()
 
-    # _axes = az.plot_forest(
-    #     [cs_nh_idata, cs_h_idata],
-    #     model_names=["non-hierarchical", "hierarchical"],
-    #     var_names="mu",
-    #     combined=True,
-    #     figsize=(14, 7),
-    # )
+    _axes = az.plot_forest(
+        [cs_nh_idata, cs_h_idata],
+        model_names=["non-hierarchical", "hierarchical"],
+        var_names="mu",
+        combined=True,
+        figsize=(14, 7),
+    )
 
-    # y_lims = _axes[0].get_ylim()
-    # _axes[0].vlines(cs_h_idata.posterior["mu_global"].mean(), *y_lims, color="k", ls=":")
+    y_lims = _axes[0].get_ylim()
+    _axes[0].vlines(cs_h_idata.posterior["mu_global"].mean(), *y_lims, color="k", ls=":")
     return
 
 
@@ -233,7 +233,7 @@ def _(mo):
 
 
 @app.cell
-def _(Path, code_cat_vars, pl, pm, rng):
+def _(Path, az, code_cat_vars, pl, pm, rng):
     TIPS_PATH = Path(__file__).parent.parent / "data" / "tips.csv"
 
     tips = pl.read_csv(TIPS_PATH)
@@ -262,14 +262,14 @@ def _(Path, code_cat_vars, pl, pm, rng):
         return tips_h_model, idata
 
 
-    # tips_h_model, tips_h_idata = fn_tips_h_model()
-    # with tips_h_model:
-    #     tips_h_idata.extend(pm.sample_posterior_predictive(tips_h_idata))
+    tips_h_model, tips_h_idata = fn_tips_h_model()
+    with tips_h_model:
+        tips_h_idata.extend(pm.sample_posterior_predictive(tips_h_idata))
 
-    # (
-    #     az.plot_forest(tips_h_idata, var_names=["mu", "mu_t"], combined=True),
-    #     az.summary(tips_h_idata, kind="stats").round(2),
-    # )
+    (
+        az.plot_forest(tips_h_idata, var_names=["mu", "mu_t"], combined=True),
+        az.summary(tips_h_idata, kind="stats").round(2),
+    )
     return
 
 
