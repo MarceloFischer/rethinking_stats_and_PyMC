@@ -861,14 +861,14 @@ def _(np, pm, pok, pok_target_col, rng):
         coords = {'obs_idx': np.arange(len(pok))}
         with pm.Model(coords=coords) as model:
             # data
-            defe = pm.Data(f'{pok_target_col}', pok[pok_target_col].to_numpy(), dims='obs_idx')
-            defe_std = pm.Data(f'{pok_target_col}_std', pok[f'{pok_target_col}_std'].to_numpy(), dims='obs_idx')
+            predictor = pm.Data(f'{pok_target_col}', pok[pok_target_col].to_numpy(), dims='obs_idx')
+            predictor_std = pm.Data(f'{pok_target_col}_std', pok[f'{pok_target_col}_std'].to_numpy(), dims='obs_idx')
             # Priors
-            α = pm.Normal('α', mu=0, sigma=1)
-            β = pm.Normal('β', mu=0, sigma=10)
+            α = pm.Normal('α', mu=60, sigma=10)
+            β = pm.Normal('β', mu=0, sigma=2)
             σ = pm.HalfNormal('σ', sigma=5)
             # Linear Model
-            μ = pm.Deterministic('μ', α + pm.math.dot(defe_std, β))
+            μ = pm.Deterministic('μ', α + pm.math.dot(predictor_std, β))
             # likelihood
             atk = pm.Normal('atk', mu=μ, sigma=σ, observed=pok['attack'], dims='obs_idx')
             idata = pm.sample(random_seed=rng)
