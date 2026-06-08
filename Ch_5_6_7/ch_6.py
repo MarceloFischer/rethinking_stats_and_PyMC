@@ -82,7 +82,7 @@ def _():
 
 @app.cell
 def _(alt, az, plt):
-    alt.themes.enable('fivethirtyeight')
+    alt.theme.enable('fivethirtyeight')
     plt.style.use("fivethirtyeight")
 
     # Set default figure size to 14 inches wide by 5 inches tall
@@ -263,13 +263,13 @@ def _(milk_data, run_linear_model):
 @app.cell
 def _(az, fat_model, lactose_fat_model, lactose_model):
     # az.summary(fat_model, kind="stats"), az.summary(lactose_model, kind="stats"), az.summary(lactose_fat_model, kind="stats")
+
     az.plot_forest(
         {'fat': fat_model, 'lactose': lactose_model, 'both': lactose_fat_model},
         var_names=["beta"],
         combined=True,
         figure_kwargs={'figsize':(14, 7)},
     )
-    # plt.legend()
     return
 
 
@@ -331,9 +331,7 @@ def _(az, pz, rng):
     (
         az.summary(rng.lognormal(0, 0.25, (1, 1000)), kind="stats"),
         pz.LogNormal(mu=0, sigma=0.25).plot_pdf(pointinterval=True, levels=[0.91])
-    #     az.plot_dist(rng.lognormal(0, 0.25, 1000)),
     )
-
 
     return
 
