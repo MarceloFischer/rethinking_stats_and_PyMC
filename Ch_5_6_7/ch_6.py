@@ -46,13 +46,9 @@ def _():
     from pathlib import Path
     from wigglystuff import EdgeDraw
 
-    # Fix for ImportError: cannot import name 'Iterable' from 'collections' in Python 3.10+
-    import collections
-    import collections.abc
-    if not hasattr(collections, 'Iterable'):
-        collections.Iterable = collections.abc.Iterable
-
-    from causalgraphicalmodels import CausalGraphicalModel
+    from pgmpy.base import DAG
+    from pgmpy.inference import CausalInference
+    from pgmpy.identification import Adjustment
     import networkx as nx
 
     from linear_models_funcs import (
@@ -70,7 +66,9 @@ def _():
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
     return (
-        CausalGraphicalModel,
+        Adjustment,
+        CausalInference,
+        DAG,
         Path,
         alt,
         az,
@@ -109,22 +107,22 @@ def _(alt, az, plt):
 
 
 @app.cell
-def _(CausalGraphicalModel, nx, plt):
-    def draw_dag(cgm_dag: CausalGraphicalModel):
-        # Convert the CGM to a networkx graph
-        _nx_graph = cgm_dag.dag
-    
+def _(nx, plt):
+    def draw_dag(dag: "DAG"):
+        # pgmpy's DAG *is* a networkx DiGraph, so no need to extract a sub-attribute
+        _nx_graph = dag
+
         # Try to calculate a topological layout (layered by "generations")
         # This ensures a top-to-bottom flow which is standard for DAGs
         for _layer, _nodes in enumerate(nx.topological_generations(_nx_graph)):
             for _node in _nodes:
                 _nx_graph.nodes[_node]["layer"] = _layer
-    
+
         _pos = nx.multipartite_layout(_nx_graph, subset_key="layer")
-    
+
         # Create the figure
         _fig, _ax = plt.subplots(figsize=(10, 6))
-    
+
         nx.draw(
             _nx_graph,
             pos=_pos,
@@ -140,9 +138,9 @@ def _(CausalGraphicalModel, nx, plt):
             # connectionstyle="arc3,rad=0.1", # Slightly curved arrows look cleaner
             ax=_ax
         )
-    
+
         _ax.set_title("Causal Graphical Model", fontsize=16, pad=20)
-    
+
         return plt.gca()
 
     return (draw_dag,)
@@ -518,16 +516,9 @@ def _(Path, cols_to_lowercase, pl, std_cols_of_interest):
 
 
 @app.cell
-def _(waffle_data):
-    waffle_data
-    return
-
-
-@app.cell
-def _(CausalGraphicalModel):
-    dag_6h1 = CausalGraphicalModel(
-        nodes=["A", "D", "M", "S", "W"],
-        edges=[
+def _(Adjustment, CausalInference, DAG):
+    dag_6h1 = DAG(
+        [
             ("A", "D"),
             ("A", "M"),
             ("M", "D"),
@@ -535,14 +526,25 @@ def _(CausalGraphicalModel):
             ("S", "M"),
             ("S", "W"),
             ("W", "D"),
-        ]
+        ],
+        roles={"exposures": "W", "outcomes": "D"}
     )
 
-    # Adjustment sets for exposure=W, outcome=D
-    dag_6h1.get_all_backdoor_adjustment_sets("W", "D")
+    # easier, old version
+    inference = CausalInference(dag_6h1)
 
-    # Implied conditional independencies
-    # dag_6h1.get_all_independence_relationships()
+    # new way, seems to be giving different answers. This shows more results than the above
+    identified_all, ok_all = Adjustment(variant="all").identify(dag_6h1)
+
+    # variant="all" returns a list of graphs (one per valid adjustment set),
+    # so we need to extract the "adjustment" role from each graph individually
+    if isinstance(identified_all, list):
+        all_adjustment_sets = [_graph.get_role("adjustment") for _graph in identified_all]
+    else:
+        all_adjustment_sets = identified_all.get_role("adjustment")
+
+    # Adjustment sets for exposure=W, outcome=D, Implied conditional independencies
+    all_adjustment_sets, inference.get_all_backdoor_adjustment_sets("W", "D"), dag_6h1.get_independencies()
     return (dag_6h1,)
 
 
@@ -557,11 +559,6 @@ def _(dag_6h1, draw_dag):
 def _(waffle_data):
     waffle_data
     # with pm.Model() as 
-    return
-
-
-@app.cell
-def _():
     return
 
 

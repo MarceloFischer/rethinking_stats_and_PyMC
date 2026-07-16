@@ -1130,9 +1130,9 @@ def _(MILK_OUTCOME, complete_milk_data, run_linear_model):
         outcome=MILK_OUTCOME,
         outcome_name="kcal.per.g_std",
         prior_predictive=True,
-        draws=50,
-        alpha_sigma=0.2,
-        beta_sigma=0.5,
+        draws=100,
+        alpha=0.2,
+        beta=0.5,
     )
     return (milk_prior,)
 
@@ -1157,8 +1157,8 @@ def _(MILK_OUTCOME, complete_milk_data, run_linear_model):
         outcome_name="kcal.per.g_std",
         prior_predictive=False,
         draws=100,
-        alpha_sigma=0.2,
-        beta_sigma=0.5,
+        alpha=0.2,
+        beta=0.5,
     )
     return (milk_post_neo_pct,)
 
@@ -1199,8 +1199,8 @@ def _(
         outcome_name="kcal.per.g_std",
         prior_predictive=False,
         draws=100,
-        alpha_sigma=0.2,
-        beta_sigma=0.5,
+        alpha=0.2,
+        beta=0.5,
     )
 
     plot_simple_regression_on_chosen_scale(
@@ -1262,21 +1262,23 @@ def _(MILK_OUTCOME, complete_milk_data, run_linear_model):
         outcome_name="kcal.per.g_std",
         prior_predictive=False,
         draws=100,
-        alpha_sigma=0.2,
-        beta_sigma=0.5,
+        alpha=0.2,
+        beta=0.5,
     )
     return (milk_post_neo_pct_and_mass,)
 
 
 @app.cell
 def _(az, milk_post_mass, milk_post_neo_pct, milk_post_neo_pct_and_mass):
-    az.plot_forest(
-        [milk_post_mass, milk_post_neo_pct, milk_post_neo_pct_and_mass],
-        model_names=["both", "Neocortex", "log_mass"],
+    _pc = az.plot_forest(
+        {"log_mass": milk_post_mass, "Neocortex": milk_post_neo_pct, "both": milk_post_neo_pct_and_mass},
         var_names=["beta"],
         combined=True,
-        figsize=(10, 5),
+        figure_kwargs={'figsize':(14, 5)}
     )
+
+    _pc.add_legend('model', title='Models')
+    _pc
     return
 
 
