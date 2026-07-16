@@ -20,7 +20,7 @@
 
 import marimo
 
-__generated_with = "0.23.2"
+__generated_with = "0.23.14"
 app = marimo.App(width="columns")
 
 
@@ -930,7 +930,7 @@ def _(
 
 @app.cell
 def _(waffle_data):
-    waffle_data.select(["medianAgeMarriage", "divorce", "marriage"]).corr()
+    waffle_data.select(["medianAgeMarriage", "divorce", "marriage"]).corr(label='cols')
     return
 
 
@@ -1012,7 +1012,8 @@ def _(az, m5_2_idata):
 @app.cell(hide_code=True)
 def _(EdgeDraw):
     divorce_age_marriage_graph = EdgeDraw(
-        names=["Divorce", "Age", "Marriage"], directed=True
+        names=["Divorce", "Age", "Marriage"], directed=True,
+        links=[('Age','Divorce'), ('Age','Marriage'), ("Marriage",'Divorce')]
     )
     divorce_age_marriage_graph
     return
@@ -1025,7 +1026,7 @@ def _(WAFFLE_OUTCOME, run_linear_model, waffle_data):
             waffle_data["marriage_std"].to_numpy(),
             waffle_data["medianAgeMarriage_std"].to_numpy(),
         ],
-        predictors_names=["marriage_std", "median_age_marriage_std"],
+        predictors_names=["marriage_std", "median_age_std"],
         outcome=WAFFLE_OUTCOME,
         outcome_name="Divorce_std",
         prior_predictive=False,
@@ -1041,18 +1042,22 @@ def _(az, m5_3_idata):
 
 
 @app.cell
+def _(m5_3_idata):
+    m5_3_idata
+    return
+
+
+@app.cell
 def _(az, m5_1_idata, m5_2_idata, m5_3_idata):
-    az.plot_forest(
-        [
-            m5_3_idata,
-            m5_2_idata,
-            m5_1_idata,
-        ],
-        model_names=["both", "marriage", "age"],
+    _pc = az.plot_forest(
+        {"both": m5_3_idata, "marriage": m5_2_idata, "age": m5_1_idata},
         var_names=["beta"],
         combined=True,
-        figsize=(10, 5),
+        figure_kwargs={'figsize':(14, 5)}
     )
+
+    _pc.add_legend('model', title='Models')
+    _pc
     return
 
 
