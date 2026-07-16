@@ -18,7 +18,7 @@
 
 import marimo
 
-__generated_with = "0.23.9"
+__generated_with = "0.23.14"
 app = marimo.App(width="columns")
 
 
@@ -46,6 +46,15 @@ def _():
     from pathlib import Path
     from wigglystuff import EdgeDraw
 
+    # Fix for ImportError: cannot import name 'Iterable' from 'collections' in Python 3.10+
+    import collections
+    import collections.abc
+    if not hasattr(collections, 'Iterable'):
+        collections.Iterable = collections.abc.Iterable
+
+    from causalgraphicalmodels import CausalGraphicalModel
+    import networkx as nx
+
     from linear_models_funcs import (
         remove_period_col_name,
         cols_to_lowercase,
@@ -61,11 +70,14 @@ def _():
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
     return (
+        CausalGraphicalModel,
         Path,
         alt,
         az,
+        cols_to_lowercase,
         mo,
         np,
+        nx,
         pl,
         plt,
         pm,
@@ -94,6 +106,46 @@ def _(alt, az, plt):
     # sets default credible interval used by arviz
     az.rcParams["stats.ci_prob"] = 0.89
     return
+
+
+@app.cell
+def _(CausalGraphicalModel, nx, plt):
+    def draw_dag(cgm_dag: CausalGraphicalModel):
+        # Convert the CGM to a networkx graph
+        _nx_graph = cgm_dag.dag
+    
+        # Try to calculate a topological layout (layered by "generations")
+        # This ensures a top-to-bottom flow which is standard for DAGs
+        for _layer, _nodes in enumerate(nx.topological_generations(_nx_graph)):
+            for _node in _nodes:
+                _nx_graph.nodes[_node]["layer"] = _layer
+    
+        _pos = nx.multipartite_layout(_nx_graph, subset_key="layer")
+    
+        # Create the figure
+        _fig, _ax = plt.subplots(figsize=(10, 6))
+    
+        nx.draw(
+            _nx_graph,
+            pos=_pos,
+            with_labels=True,
+            node_color="#4C72B0",
+            node_size=1000,
+            font_color="white",
+            font_size=14,
+            font_weight="bold",
+            arrowsize=25,
+            edge_color="#666666",
+            width=2,
+            # connectionstyle="arc3,rad=0.1", # Slightly curved arrows look cleaner
+            ax=_ax
+        )
+    
+        _ax.set_title("Causal Graphical Model", fontsize=16, pad=20)
+    
+        return plt.gca()
+
+    return (draw_dag,)
 
 
 @app.cell(hide_code=True)
@@ -332,7 +384,6 @@ def _(az, pz, rng):
         az.summary(rng.lognormal(0, 0.25, (1, 1000)), kind="stats"),
         pz.LogNormal(mu=0, sigma=0.25).plot_pdf(pointinterval=True, levels=[0.91])
     )
-
     return
 
 
@@ -410,7 +461,116 @@ def _():
     return
 
 
-@app.cell(column=2)
+@app.cell(column=2, hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Exercises
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## 6H1
+
+    Use the Waffle House data, data(WaffleDivorce), to find the total causal influence of number of Waffle Houses on divorce rate. Justify your model or models with a causal graph
+    """)
+    return
+
+
+@app.cell
+def _(Path, cols_to_lowercase, pl, std_cols_of_interest):
+    WAFFLE_PATH = Path(__file__).parent.parent / "data" / "WaffleDivorce.csv"
+
+    raw_waffle_data = pl.read_csv(WAFFLE_PATH, separator=";")
+
+    def select_cols(df: pl.DataFrame, cols: list[str]) -> pl.DataFrame:
+        return df.select(cols)
+
+    cols_to_keep_waffle = [
+      # "location",
+      # "loc",
+      # "population",
+      "medianAgeMarriage",
+      "marriage",
+      # "marriage SE",
+      "divorce",
+      # "divorce SE",
+      "waffleHouses",
+      "south",
+      # "slaves1860",
+      # "population1860",
+      # "propSlaves1860",
+      "divorce_std",
+      "medianAgeMarriage_std",
+      "waffleHouses_std",
+      "marriage_std"
+    ]
+
+    waffle_data = (
+        raw_waffle_data
+        .pipe(cols_to_lowercase)
+        .pipe(std_cols_of_interest, ["divorce", "medianAgeMarriage", "marriage", "waffleHouses"])
+        .pipe(select_cols, cols_to_keep_waffle)
+    )
+    return (waffle_data,)
+
+
+@app.cell
+def _(waffle_data):
+    waffle_data
+    return
+
+
+@app.cell
+def _(CausalGraphicalModel):
+    dag_6h1 = CausalGraphicalModel(
+        nodes=["A", "D", "M", "S", "W"],
+        edges=[
+            ("A", "D"),
+            ("A", "M"),
+            ("M", "D"),
+            ("S", "A"),
+            ("S", "M"),
+            ("S", "W"),
+            ("W", "D"),
+        ]
+    )
+
+    # Adjustment sets for exposure=W, outcome=D
+    dag_6h1.get_all_backdoor_adjustment_sets("W", "D")
+
+    # Implied conditional independencies
+    # dag_6h1.get_all_independence_relationships()
+    return (dag_6h1,)
+
+
+@app.cell
+def _(dag_6h1, draw_dag):
+    # Pass your existing dag_6h1 to the function
+    draw_dag(dag_6h1)
+    return
+
+
+@app.cell
+def _(waffle_data):
+    waffle_data
+    # with pm.Model() as 
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell
 def _():
     return
 
