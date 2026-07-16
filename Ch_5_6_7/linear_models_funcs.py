@@ -13,7 +13,7 @@
 
 import marimo
 
-__generated_with = "0.23.3"
+__generated_with = "0.23.14"
 app = marimo.App(width="columns")
 
 with app.setup:
@@ -144,13 +144,20 @@ def plot_simple_regression_on_chosen_scale(
         label="MAP regression line",
     )
 
-    # 89% HDI
-    mu_hdi = az.hdi(mu, hdi_prob=0.89)
-    az.plot_hdi(
-        x=plot_x,
-        hdi_data=mu_hdi,
-        color="green",
-    )
+    # # 89% HDI
+    # az.plot_lm(
+    #     dt=idata,
+    #     # x="temperature",
+    #     # y="rented",
+    #     ci_kind="hdi",
+    #     ci_prob=(0.5, 0.89),
+    # )
+    # mu_hdi = az.hdi(mu, prob=0.89)
+    # az.plot_hdi(
+    #     x=plot_x,
+    #     hdi_data=mu_hdi,
+    #     color="green",
+    # )
 
     plt.xlabel(x_label)
     plt.ylabel(y_label)
@@ -213,11 +220,11 @@ def plot_counterfactual(
     mu_samples = mu_pred.reshape(
         -1, 50
     )  # flatten chain/draws but keep the 50 x_values (total_draws, 50)
-    mu_hdi = az.hdi(mu_samples, hdi_prob=0.89)
+    mu_hdi = az.hdi(mu_samples, prob=0.89)
 
     # 5. Plot
     plt.plot(seq, mu_mean, label=f"Counterfactual: {predictor_name}")
-    az.plot_hdi(seq, mu_hdi.T)
+    # az.plot_hdi(seq, mu_hdi.T)
 
     plt.xlabel(f"{predictor_name} (std)")
     plt.ylabel("Predicted kcal per g (std)")
