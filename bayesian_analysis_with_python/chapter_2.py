@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.5"
+__generated_with = "0.23.14"
 app = marimo.App(width="columns")
 
 
@@ -20,8 +20,8 @@ def _():
     import arviz as az
     import preliz as pz
     import matplotlib.pyplot as plt
-    import marimo as moe
     import numpy as np
+    import xarray as xr
     import polars as pl
     import pandas as pd
     import pymc as pm
@@ -39,20 +39,7 @@ def _():
     plt.rcParams["figure.autolayout"] = True
     # sets default credible interval used by arviz
     az.rcParams["stats.ci_prob"] = 0.89
-    return (
-        Path,
-        RANDOM_SEED,
-        alt,
-        az,
-        combinations,
-        mo,
-        np,
-        pl,
-        plt,
-        pm,
-        pz,
-        rng,
-    )
+    return Path, alt, az, combinations, mo, np, pl, plt, pm, pz, rng, xr
 
 
 @app.cell(hide_code=True)
@@ -123,17 +110,28 @@ def _(mo):
 @app.cell
 def _(az, pl, plt, tips):
     _tips_dict = {
-        day: tips.filter(pl.col("day") == day)["tip"].to_numpy()
+        day: tips.filter(pl.col("day") == day)["tip"].to_numpy()[None, :]
         for day in tips["day"].unique().to_list()
     }
 
-    az.plot_forest(
-        _tips_dict,
-        kind="ridgeplot",
-        ridgeplot_truncate=False,
-        ridgeplot_quantiles=[0.25, 0.5, 0.75],
-        ridgeplot_overlap=2.2,
+    _tips_trees = {
+        day: az.from_dict(
+            {"posterior": {"tip": samples}},
+            dims={"tip": ["chain", "draw"]},
+        )
+        for day, samples in _tips_dict.items()
+    }
+
+    # The 'labels' parameter in plot_ridge labels the Y-axis for each distribution
+    _pc = az.plot_ridge(
+        _tips_trees,
+        var_names=["tip"],
+        kind="kde",
+        ridge_height=0.1,
+        # labels=list(_tips_trees.keys()),
+        figure_kwargs={'figsize':(12,4)}
     )
+    _pc.add_legend(dim='model')
 
     plt.title("Distribution of Tips per Weekday")
     plt.xlabel("Tip Amount")
@@ -234,12 +232,18 @@ def _(day_idx, days, pm, rng, tips):
 
 
     day_tip_model, day_tip_idata = tips_model()
-    return day_tip_idata, day_tip_model
+
+    with day_tip_model:
+        day_tip_idata = pm.sample_posterior_predictive(
+            day_tip_idata,
+            extend_inferencedata=True,
+        )
+    return (day_tip_idata,)
 
 
 @app.cell
 def _(az, day_tip_idata):
-    az.plot_forest(day_tip_idata, var_names=['mu'], combined=True), az.summary(day_tip_idata, kind='stats').round(2)
+    az.plot_forest(day_tip_idata, var_names=['mu'], combined=True, figure_kwargs={'figsize': (10, 4)}), az.summary(day_tip_idata, kind='stats').round(2)
     return
 
 
@@ -251,36 +255,44 @@ def _(day_tip_idata):
 
 @app.cell
 def _(az, day_tip_idata):
-    az.plot_posterior(day_tip_idata, figsize=(14, 7))
+    az.plot_dist(day_tip_idata, figure_kwargs={'figsize':(14, 7)})
     return
 
 
 @app.cell
-def _(RANDOM_SEED, az, day_tip_idata, day_tip_model, days, plt, pm):
-    with day_tip_model:
-        day_tip_idata.extend(pm.sample_posterior_predictive(day_tip_idata))
-
-    _, axes = plt.subplots(2, 2)
-    az.plot_ppc(
+def _(az, day_tip_idata):
+    az.plot_ppc_dist(
         day_tip_idata,
-        num_pp_samples=100,
-        coords={"days_flat": days},
-        flatten=[],
-        ax=axes,
-        random_seed=RANDOM_SEED,
+        kind='kde',
+        num_samples=100,
+        cols=['days_flat'],
+        col_wrap=2,
+        backend="matplotlib",
+        figure_kwargs={'figsize':(14, 4)}
     )
     return
 
 
 @app.cell
-def _(az, combinations, day_tip_idata, days):
+def _(az, combinations, day_tip_idata, days, xr):
     diffs = {}
     for day_1, day_2 in combinations(days, 2):
         diffs[f"{day_1}-{day_2}"] = day_tip_idata.posterior["mu"].sel(
             days=day_1
         ) - day_tip_idata.posterior["mu"].sel(days=day_2)
 
-    az.plot_posterior(diffs, ref_val=0, figsize=(14, 7))
+    # Bundle the DataArrays into a Dataset so plot_dist can facet over them
+    diff_ds = xr.Dataset(diffs)
+
+    az.plot_dist(
+        diff_ds, kind="kde", col_wrap=3,
+        figure_kwargs={"figsize": (14, 7)}
+    )
+    return
+
+
+@app.cell
+def _():
     return
 
 
