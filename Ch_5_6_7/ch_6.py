@@ -318,7 +318,7 @@ def _(az, fat_model, lactose_fat_model, lactose_model):
         {'fat': fat_model, 'lactose': lactose_model, 'both': lactose_fat_model},
         var_names=["beta"],
         combined=True,
-        figure_kwargs={'figsize':(14, 7)},
+        figure_kwargs={'figsize':(10, 4)},
     )
     return
 
@@ -518,7 +518,7 @@ def _(Path, cols_to_lowercase, pl, std_cols_of_interest):
 
 
 @app.cell
-def _(Adjustment, CausalInference, DAG):
+def _(DAG):
     dag_6h1 = DAG(
         [
             ("A", "D"),
@@ -531,7 +531,17 @@ def _(Adjustment, CausalInference, DAG):
         ],
         roles={"exposures": "W", "outcomes": "D"}
     )
+    return (dag_6h1,)
 
+
+@app.cell
+def _(dag_6h1, draw_dag):
+    draw_dag(dag_6h1)
+    return
+
+
+@app.cell
+def _(Adjustment, CausalInference, dag_6h1):
     # easier, old version
     inference = CausalInference(dag_6h1)
 
@@ -549,12 +559,6 @@ def _(Adjustment, CausalInference, DAG):
     # all_adjustment_sets, inference.get_all_backdoor_adjustment_sets("W", "D"), dag_6h1.get_independencies()
 
     inference.get_all_backdoor_adjustment_sets("W", "D"), dag_6h1.get_independencies()
-    return (dag_6h1,)
-
-
-@app.cell
-def _(dag_6h1, draw_dag):
-    draw_dag(dag_6h1)
     return
 
 
