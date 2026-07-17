@@ -72,7 +72,6 @@ def _():
         Path,
         alt,
         az,
-        cols_to_lowercase,
         mo,
         np,
         nx,
@@ -477,14 +476,17 @@ def _(mo):
     return
 
 
-@app.cell
-def _(Path, cols_to_lowercase, pl, std_cols_of_interest):
+app._unparsable_cell(
+    r"""
     WAFFLE_PATH = Path(__file__).parent.parent / "data" / "WaffleDivorce.csv"
 
     raw_waffle_data = pl.read_csv(WAFFLE_PATH, separator=";")
 
     def select_cols(df: pl.DataFrame, cols: list[str]) -> pl.DataFrame:
         return df.select(cols)
+
+    def create_south_cat_col():
+    
 
     cols_to_keep_waffle = [
       # "location",
@@ -513,8 +515,18 @@ def _(Path, cols_to_lowercase, pl, std_cols_of_interest):
         .pipe(select_cols, cols_to_keep_waffle)
     )
 
+    # region_cat = ['not_south','south']
+    # region_idx = waffle_data['south'].cast(pl.Enum(region)).to_physical().to_numpy()
     WAFFLE_OUTCOME = waffle_data["divorce_std"].to_numpy()
-    return WAFFLE_OUTCOME, waffle_data
+    """,
+    name="_"
+)
+
+
+@app.cell
+def _(region, region_idx):
+    region, region_idx
+    return
 
 
 @app.cell
@@ -563,26 +575,75 @@ def _(Adjustment, CausalInference, dag_6h1):
 
 
 @app.cell
-def _(WAFFLE_OUTCOME, run_linear_model, waffle_data):
-    m5_1_idata = run_linear_model(
-        predictors=[waffle_data["medianAgeMarriage_std"].to_numpy()],
-        predictors_names=["median_age_std"],
-        outcome=WAFFLE_OUTCOME,
-        outcome_name="Divorce_std",
-        prior_predictive=False,
-        draws=100,
-    )
-    return (m5_1_idata,)
+def _(np, pm, rng, waffle_data):
+    with pm.Model(coords={'obs': np.arange(waffle_data.shape[0]), 'region': ['not_south','south']}) as model_region:
+        # Data
+        _south= pm.Data("south", waffle_data["south"].to_numpy(), dims="obs")
+        _w = pm.Data('W', waffle_data['waffleHouses_std'].to_numpy(), dims="obs")
+        # priors
+        _α = pm.Normal('α', 0, 0.5, dims='region')
+        _β = pm.Normal('β', 0, 0.8, dims='region')
+        _σ = pm.Exponential('σ', 1)
+        # Mean
+        _μ = pm.Deterministic('μ', _α[_south] + _β[_south] * _w, dims="obs")
+        # Likelihood
+        _div = pm.Normal('D', mu=_μ, sigma=_σ, observed=waffle_data['divorce_std'], dims="obs")
+
+        region_idata = pm.sample(1000, random_seed=rng)
+        pm.sample_posterior_predictive(region_idata, extend_inferencedata=True, random_seed=rng)
+
+    with pm.Model(coords={'obs': np.arange(waffle_data.shape[0])}) as model_additive:
+        # Data
+        _south= pm.Data("south", waffle_data["south"].to_numpy(), dims="obs")
+        _w = pm.Data('W', waffle_data['waffleHouses_std'].to_numpy(), dims="obs")
+        # priors
+        _α = pm.Normal('α', 0, 0.5)
+        _β_w = pm.Normal('β_w', 0, 0.5)
+        _β_s = pm.Normal('β_s', 0, 0.5)
+        _σ = pm.Exponential('σ', 1)
+        # Mean
+        _μ = pm.Deterministic('μ', _α + _β_w*_w + _β_s*_south, dims="obs")
+        # Likelihood
+        _div = pm.Normal('D', mu=_μ, sigma=_σ, observed=waffle_data['divorce_std'], dims="obs")
+
+        region_idata_add = pm.sample(1000, random_seed=rng)
+        pm.sample_posterior_predictive(region_idata_add, extend_inferencedata=True, random_seed=rng)
+    return region_idata, region_idata_add
 
 
 @app.cell
-def _(az, m5_1_idata):
-    az.summary(m5_1_idata, kind='stats')
+def _(az, region_idata, region_idata_add):
+    az.summary(region_idata, var_names=['~μ'], kind='stats'), az.summary(region_idata_add, var_names=['~μ'], kind='stats')
     return
 
 
 @app.cell
-def _():
+def _(az, region_idata):
+    az.plot_trace_dist(region_idata, var_names=['~μ'], figure_kwargs={'figsize':(10, 6)})
+    return
+
+
+@app.cell
+def _(az, region_idata, region_idata_add):
+    az.plot_forest(
+        {'additive (shared slope)': region_idata_add, "region-stratified": region_idata},
+        var_names=["β_w", "β"],
+        combined=True,
+        # hdi_prob=0.94,
+        figure_kwargs={'figsize':(10, 4)},
+    )
+    return
+
+
+@app.cell
+def _(az, region_idata_add):
+    az.plot_dist(region_idata_add, var_names=['β_w'])
+    return
+
+
+@app.cell
+def _(az, region_idata):
+    az.plot_dist(region_idata, var_names=['β'], col_wrap=1)
     return
 
 
