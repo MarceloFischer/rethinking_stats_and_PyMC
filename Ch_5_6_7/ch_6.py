@@ -135,7 +135,7 @@ def _(nx, plt):
             arrowsize=25,
             edge_color="#666666",
             width=2,
-            # connectionstyle="arc3,rad=0.1", # Slightly curved arrows look cleaner
+            connectionstyle="arc3,rad=0.1", # Slightly curved arrows look cleaner
             ax=_ax
         )
 
@@ -512,7 +512,9 @@ def _(Path, cols_to_lowercase, pl, std_cols_of_interest):
         .pipe(std_cols_of_interest, ["divorce", "medianAgeMarriage", "marriage", "waffleHouses"])
         .pipe(select_cols, cols_to_keep_waffle)
     )
-    return (waffle_data,)
+
+    WAFFLE_OUTCOME = waffle_data["divorce_std"].to_numpy()
+    return WAFFLE_OUTCOME, waffle_data
 
 
 @app.cell
@@ -544,26 +546,34 @@ def _(Adjustment, CausalInference, DAG):
         all_adjustment_sets = identified_all.get_role("adjustment")
 
     # Adjustment sets for exposure=W, outcome=D, Implied conditional independencies
-    all_adjustment_sets, inference.get_all_backdoor_adjustment_sets("W", "D"), dag_6h1.get_independencies()
+    # all_adjustment_sets, inference.get_all_backdoor_adjustment_sets("W", "D"), dag_6h1.get_independencies()
+
+    inference.get_all_backdoor_adjustment_sets("W", "D"), dag_6h1.get_independencies()
     return (dag_6h1,)
 
 
 @app.cell
 def _(dag_6h1, draw_dag):
-    # Pass your existing dag_6h1 to the function
     draw_dag(dag_6h1)
     return
 
 
 @app.cell
-def _(waffle_data):
-    waffle_data
-    # with pm.Model() as 
-    return
+def _(WAFFLE_OUTCOME, run_linear_model, waffle_data):
+    m5_1_idata = run_linear_model(
+        predictors=[waffle_data["medianAgeMarriage_std"].to_numpy()],
+        predictors_names=["median_age_std"],
+        outcome=WAFFLE_OUTCOME,
+        outcome_name="Divorce_std",
+        prior_predictive=False,
+        draws=100,
+    )
+    return (m5_1_idata,)
 
 
 @app.cell
-def _():
+def _(az, m5_1_idata):
+    az.summary(m5_1_idata, kind='stats')
     return
 
 
