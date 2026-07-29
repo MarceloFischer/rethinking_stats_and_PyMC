@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.14"
+__generated_with = "0.23.15"
 app = marimo.App(width="columns")
 
 
@@ -243,7 +243,10 @@ def _(day_idx, days, pm, rng, tips):
 
 @app.cell
 def _(az, day_tip_idata):
-    az.plot_forest(day_tip_idata, var_names=['mu'], combined=True, figure_kwargs={'figsize': (10, 4)}), az.summary(day_tip_idata, kind='stats').round(2)
+    (
+        az.plot_forest(day_tip_idata, var_names=['mu'], combined=True, figure_kwargs={'figsize': (10, 4)}),
+        az.summary(day_tip_idata, kind='stats').round(2)
+    )
     return
 
 
@@ -448,7 +451,7 @@ def _(mo):
     mo.md(r"""
     \begin{split}
     \begin{aligned}
-      D_t &\sim \text{Pois}(r_t), r_t= \begin{cases}
+      D_{t} &\sim \text{Pois}(r_t), r_t= \begin{cases}
        e, & \text{if } t \le s \\
        l, & \text{if } t \gt s
        \end{cases} \\
