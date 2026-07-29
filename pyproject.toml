@@ -6,5 +6,5 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "basedpyright>=1.39.3",
-    "marimo[recomended]>=0.19.4",
+    "marimo[recomended]>=0.23.3",
 ]
