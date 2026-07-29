@@ -26,7 +26,7 @@ def _():
     plt.rcParams["figure.autolayout"] = True
     # sets default credible interval used by arviz
     az.rcParams["stats.ci_prob"] = 0.89
-    return Path, az, mo, pl, plt, pm, rng
+    return Path, az, mo, np, pl, plt, pm, rng
 
 
 @app.cell
@@ -122,34 +122,57 @@ def _(aa_cats, aa_idx, cs_data, pm, rng):
             idata = pm.sample(random_seed=rng)
         return cs_h_model, idata
 
-    return fn_cs_h_model, fn_cs_nh_model
+    cs_nh_model, cs_nh_idata = fn_cs_nh_model()
+    cs_h_model, cs_h_idata = fn_cs_h_model()
+    return cs_h_idata, cs_nh_idata
 
 
 @app.cell
-def _(az, fn_cs_h_model, fn_cs_nh_model, plt):
-    cs_nh_model, cs_nh_idata = fn_cs_nh_model()
-    cs_h_model, cs_h_idata = fn_cs_h_model()
-
+def _(az, cs_h_idata, cs_nh_idata, plt):
     _pc = az.plot_forest(
         {"non-hierarchical": cs_nh_idata, "hierarchical": cs_h_idata},
         var_names="mu",
         combined=True,
-        figure_kwargs={"figsize": (14, 7)}
+        figure_kwargs={"figsize": (14, 7)},
     )
 
-    _pc.add_legend('model', title='Models')
-    # y_lims = _pc[0].get_ylim()
-    # _pc[0].vlines(cs_h_idata.posterior["mu_global"].mean(), *y_lims, color="k", ls=":")
+    _pc.add_legend("model", title="Models")
+    _pc.coords = {"column": "forest"}
+
+    az.add_lines(
+        _pc,
+        [cs_h_idata.posterior["mu_global"].mean()],
+        coords={"column": "forest"},
+    )
+    _pc.coords = None  # reset so the rest of the collection behaves normally
+
     plt.gca()
-    return
+    # _pc.viz
 
+    ###########
+    # plt Way #
+    ###########
 
-@app.cell
-def _():
+    # _fig = plt.gcf()
+    # _axes = _fig.get_axes()
+    # _forest_ax = _axes[-1]  # the rightmost panel = the actual "forest" (values) axis
+    # _forest_ax.axvline(cs_h_idata.posterior["mu_global"].mean().item(), color="black", linestyle="--", linewidth=1)
     return
 
 
 @app.cell(column=1)
+def _(np):
+    N_samples = [30, 30, 30]
+    G_samples = [18, 18, 18]
+    group_idx = np.repeat(np.arange(len(N_samples)), N_samples)
+    data = []
+    for i in range(0, len(N_samples)):
+        data.extend(np.repeat([1, 0], [G_samples[i], N_samples[i]-G_samples[i]]))
+    data
+    return
+
+
+@app.cell
 def _():
     # pz.maxent(pz.Gamma(), 50, 200, 0.9)
     # pz.Gamma(6.94, 0.0549).plot_pdf(moments='md', pointinterval=True)
