@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.8"
+__generated_with = "0.23.15"
 app = marimo.App(width="columns")
 
 
@@ -26,7 +26,7 @@ def _():
     plt.rcParams["figure.autolayout"] = True
     # sets default credible interval used by arviz
     az.rcParams["stats.ci_prob"] = 0.89
-    return Path, az, mo, pl, pm, rng
+    return Path, az, mo, pl, plt, pm, rng
 
 
 @app.cell
@@ -126,20 +126,21 @@ def _(aa_cats, aa_idx, cs_data, pm, rng):
 
 
 @app.cell
-def _(az, fn_cs_h_model, fn_cs_nh_model):
+def _(az, fn_cs_h_model, fn_cs_nh_model, plt):
     cs_nh_model, cs_nh_idata = fn_cs_nh_model()
     cs_h_model, cs_h_idata = fn_cs_h_model()
 
-    _axes = az.plot_forest(
-        [cs_nh_idata, cs_h_idata],
-        model_names=["non-hierarchical", "hierarchical"],
+    _pc = az.plot_forest(
+        {"non-hierarchical": cs_nh_idata, "hierarchical": cs_h_idata},
         var_names="mu",
         combined=True,
-        figsize=(14, 7),
+        figure_kwargs={"figsize": (14, 7)}
     )
 
-    y_lims = _axes[0].get_ylim()
-    _axes[0].vlines(cs_h_idata.posterior["mu_global"].mean(), *y_lims, color="k", ls=":")
+    _pc.add_legend('model', title='Models')
+    # y_lims = _pc[0].get_ylim()
+    # _pc[0].vlines(cs_h_idata.posterior["mu_global"].mean(), *y_lims, color="k", ls=":")
+    plt.gca()
     return
 
 
@@ -264,10 +265,10 @@ def _(Path, az, code_cat_vars, pl, pm, rng):
 
     tips_h_model, tips_h_idata = fn_tips_h_model()
     with tips_h_model:
-        tips_h_idata.extend(pm.sample_posterior_predictive(tips_h_idata))
+        tips_h_idata.update(pm.sample_posterior_predictive(tips_h_idata))
 
     (
-        az.plot_forest(tips_h_idata, var_names=["mu", "mu_t"], combined=True),
+        az.plot_forest(tips_h_idata, var_names=["mu", "mu_t"], combined=True, figure_kwargs={"figsize": (14, 7)}),
         az.summary(tips_h_idata, kind="stats").round(2),
     )
     return
