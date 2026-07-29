@@ -3,11 +3,15 @@
 # dependencies = [
 #     "altair==6.0.0",
 #     "arviz==0.23.4",
+#     "arviz-base>=1.2.0",
 #     "hvplot==0.12.2",
-#     "marimo>=0.22.4",
+#     "marimo>=0.23.3",
 #     "matplotlib==3.10.8",
+#     "networkx>=3.6.1",
 #     "numpy==2.4.4",
+#     "pgmpy>=1.1.2",
 #     "polars==1.39.3",
+#     "preliz>=0.25.0",
 #     "pyarrow==23.0.1",
 #     "pymc==5.28.3",
 #     "scipy==1.17.1",
@@ -65,6 +69,7 @@ def _():
 
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
+
     return (
         Adjustment,
         CausalInference,
@@ -91,7 +96,7 @@ def _():
 
 @app.cell
 def _(alt, az, plt):
-    alt.theme.enable('fivethirtyeight')
+    alt.theme.enable("fivethirtyeight")
     plt.style.use("fivethirtyeight")
 
     # Set default figure size to 14 inches wide by 5 inches tall
@@ -102,6 +107,7 @@ def _(alt, az, plt):
     plt.rcParams["figure.autolayout"] = True
     # sets default credible interval used by arviz
     az.rcParams["stats.ci_prob"] = 0.89
+
     return
 
 
@@ -134,13 +140,14 @@ def _(nx, plt):
             arrowsize=25,
             edge_color="#666666",
             width=2,
-            connectionstyle="arc3,rad=0.1", # Slightly curved arrows look cleaner
-            ax=_ax
+            connectionstyle="arc3,rad=0.1",  # Slightly curved arrows look cleaner
+            ax=_ax,
         )
 
         _ax.set_title("Causal Graphical Model", fontsize=16, pad=20)
 
         return plt.gca()
+
 
     return (draw_dag,)
 
@@ -161,6 +168,7 @@ def _(Path, pl):
     MILK_PATH = Path(__file__).parent.parent / "data" / "milk.csv"
 
     raw_milk_data = pl.read_csv(MILK_PATH, separator=";")
+
     return (raw_milk_data,)
 
 
@@ -181,12 +189,14 @@ def _(
         .pipe(std_log_mass)
     )
     # fmt: on
+
     return (milk_data,)
 
 
 @app.cell
 def _(milk_data):
     milk_data
+
     return
 
 
@@ -233,11 +243,7 @@ def _(alt, milk_data, mo):
     )
 
     mo.ui.altair_chart(_chart)
-    return
 
-
-@app.cell
-def _():
     return
 
 
@@ -269,6 +275,7 @@ def _(milk_data, sns):
         height=2,
         aspect=1.7,
     )
+
     return
 
 
@@ -306,6 +313,7 @@ def _(milk_data, run_linear_model):
         alpha=0.2,
         beta=0.5,
     )
+
     return fat_model, lactose_fat_model, lactose_model
 
 
@@ -314,11 +322,12 @@ def _(az, fat_model, lactose_fat_model, lactose_model):
     # az.summary(fat_model, kind="stats"), az.summary(lactose_model, kind="stats"), az.summary(lactose_fat_model, kind="stats")
 
     az.plot_forest(
-        {'fat': fat_model, 'lactose': lactose_model, 'both': lactose_fat_model},
+        {"fat": fat_model, "lactose": lactose_model, "both": lactose_fat_model},
         var_names=["beta"],
         combined=True,
-        figure_kwargs={'figsize':(10, 4)},
+        figure_kwargs={"figsize": (10, 4)},
     )
+
     return
 
 
@@ -359,6 +368,7 @@ def _(np, pl, rng):
     _d = pl.DataFrame({"h0": _h0, "h1": _h1, "treatment": _treatment, "funfus": _fungus})
 
     _d
+
     return
 
 
@@ -379,8 +389,9 @@ def _(mo):
 def _(az, pz, rng):
     (
         az.summary(rng.lognormal(0, 0.25, (1, 1000)), kind="stats"),
-        pz.LogNormal(mu=0, sigma=0.25).plot_pdf(pointinterval=True, levels=[0.91])
+        pz.LogNormal(mu=0, sigma=0.25).plot_pdf(pointinterval=True, levels=[0.91]),
     )
+
     return
 
 
@@ -419,8 +430,8 @@ def _(az, np, pm, rng):
             bf = pm.Normal("fungus", 0, 0.5)
             sigma = pm.Exponential("sigma", 1)
 
-            p = a + bt*treatment + bf*fungus
-            mu = h0*p
+            p = a + bt * treatment + bf * fungus
+            mu = h0 * p
 
             h1_inference = pm.Normal("h1", mu, sigma, observed=h1)
 
@@ -428,18 +439,21 @@ def _(az, np, pm, rng):
 
         return idata
 
+
     return (run_fungus_model,)
 
 
 @app.cell
 def _(run_fungus_model):
     fungus_model_wrong = run_fungus_model()
+
     return (fungus_model_wrong,)
 
 
 @app.cell
 def _(az, fungus_model_wrong):
     az.summary(fungus_model_wrong, kind="stats")
+
     return
 
 
@@ -486,7 +500,7 @@ app._unparsable_cell(
         return df.select(cols)
 
     def create_south_cat_col():
-    
+
 
     cols_to_keep_waffle = [
       # "location",
@@ -518,6 +532,7 @@ app._unparsable_cell(
     # region_cat = ['not_south','south']
     # region_idx = waffle_data['south'].cast(pl.Enum(region)).to_physical().to_numpy()
     WAFFLE_OUTCOME = waffle_data["divorce_std"].to_numpy()
+
     """,
     name="_"
 )
@@ -526,6 +541,7 @@ app._unparsable_cell(
 @app.cell
 def _(region, region_idx):
     region, region_idx
+
     return
 
 
@@ -541,14 +557,16 @@ def _(DAG):
             ("S", "W"),
             ("W", "D"),
         ],
-        roles={"exposures": "W", "outcomes": "D"}
+        roles={"exposures": "W", "outcomes": "D"},
     )
+
     return (dag_6h1,)
 
 
 @app.cell
 def _(dag_6h1, draw_dag):
     draw_dag(dag_6h1)
+
     return
 
 
@@ -571,79 +589,99 @@ def _(Adjustment, CausalInference, dag_6h1):
     # all_adjustment_sets, inference.get_all_backdoor_adjustment_sets("W", "D"), dag_6h1.get_independencies()
 
     inference.get_all_backdoor_adjustment_sets("W", "D"), dag_6h1.get_independencies()
+
     return
 
 
 @app.cell
 def _(np, pm, rng, waffle_data):
-    with pm.Model(coords={'obs': np.arange(waffle_data.shape[0]), 'region': ['not_south','south']}) as model_region:
+    with pm.Model(
+        coords={"obs": np.arange(waffle_data.shape[0]), "region": ["not_south", "south"]}
+    ) as model_region:
         # Data
-        _south= pm.Data("south", waffle_data["south"].to_numpy(), dims="obs")
-        _w = pm.Data('W', waffle_data['waffleHouses_std'].to_numpy(), dims="obs")
+        _south = pm.Data("south", waffle_data["south"].to_numpy(), dims="obs")
+        _w = pm.Data("W", waffle_data["waffleHouses_std"].to_numpy(), dims="obs")
         # priors
-        _α = pm.Normal('α', 0, 0.5, dims='region')
-        _β = pm.Normal('β', 0, 0.8, dims='region')
-        _σ = pm.Exponential('σ', 1)
+        _α = pm.Normal("α", 0, 0.5, dims="region")
+        _β = pm.Normal("β", 0, 0.8, dims="region")
+        _σ = pm.Exponential("σ", 1)
         # Mean
-        _μ = pm.Deterministic('μ', _α[_south] + _β[_south] * _w, dims="obs")
+        _μ = pm.Deterministic("μ", _α[_south] + _β[_south] * _w, dims="obs")
         # Likelihood
-        _div = pm.Normal('D', mu=_μ, sigma=_σ, observed=waffle_data['divorce_std'], dims="obs")
+        _div = pm.Normal(
+            "D", mu=_μ, sigma=_σ, observed=waffle_data["divorce_std"], dims="obs"
+        )
 
         region_idata = pm.sample(1000, random_seed=rng)
-        pm.sample_posterior_predictive(region_idata, extend_inferencedata=True, random_seed=rng)
+        pm.sample_posterior_predictive(
+            region_idata, extend_inferencedata=True, random_seed=rng
+        )
 
-    with pm.Model(coords={'obs': np.arange(waffle_data.shape[0])}) as model_additive:
+    with pm.Model(coords={"obs": np.arange(waffle_data.shape[0])}) as model_additive:
         # Data
-        _south= pm.Data("south", waffle_data["south"].to_numpy(), dims="obs")
-        _w = pm.Data('W', waffle_data['waffleHouses_std'].to_numpy(), dims="obs")
+        _south = pm.Data("south", waffle_data["south"].to_numpy(), dims="obs")
+        _w = pm.Data("W", waffle_data["waffleHouses_std"].to_numpy(), dims="obs")
         # priors
-        _α = pm.Normal('α', 0, 0.5)
-        _β_w = pm.Normal('β_w', 0, 0.5)
-        _β_s = pm.Normal('β_s', 0, 0.5)
-        _σ = pm.Exponential('σ', 1)
+        _α = pm.Normal("α", 0, 0.5)
+        _β_w = pm.Normal("β_w", 0, 0.5)
+        _β_s = pm.Normal("β_s", 0, 0.5)
+        _σ = pm.Exponential("σ", 1)
         # Mean
-        _μ = pm.Deterministic('μ', _α + _β_w*_w + _β_s*_south, dims="obs")
+        _μ = pm.Deterministic("μ", _α + _β_w * _w + _β_s * _south, dims="obs")
         # Likelihood
-        _div = pm.Normal('D', mu=_μ, sigma=_σ, observed=waffle_data['divorce_std'], dims="obs")
+        _div = pm.Normal(
+            "D", mu=_μ, sigma=_σ, observed=waffle_data["divorce_std"], dims="obs"
+        )
 
         region_idata_add = pm.sample(1000, random_seed=rng)
-        pm.sample_posterior_predictive(region_idata_add, extend_inferencedata=True, random_seed=rng)
+        pm.sample_posterior_predictive(
+            region_idata_add, extend_inferencedata=True, random_seed=rng
+        )
+
     return region_idata, region_idata_add
 
 
 @app.cell
 def _(az, region_idata, region_idata_add):
-    az.summary(region_idata, var_names=['~μ'], kind='stats'), az.summary(region_idata_add, var_names=['~μ'], kind='stats')
+    (
+        az.summary(region_idata, var_names=["~μ"], kind="stats"),
+        az.summary(region_idata_add, var_names=["~μ"], kind="stats"),
+    )
+
     return
 
 
 @app.cell
 def _(az, region_idata):
-    az.plot_trace_dist(region_idata, var_names=['~μ'], figure_kwargs={'figsize':(10, 6)})
+    az.plot_trace_dist(region_idata, var_names=["~μ"], figure_kwargs={"figsize": (10, 6)})
+
     return
 
 
 @app.cell
 def _(az, region_idata, region_idata_add):
     az.plot_forest(
-        {'additive (shared slope)': region_idata_add, "region-stratified": region_idata},
+        {"additive (shared slope)": region_idata_add, "region-stratified": region_idata},
         var_names=["β_w", "β"],
         combined=True,
         # hdi_prob=0.94,
-        figure_kwargs={'figsize':(10, 4)},
+        figure_kwargs={"figsize": (10, 4)},
     )
+
     return
 
 
 @app.cell
 def _(az, region_idata_add):
-    az.plot_dist(region_idata_add, var_names=['β_w'])
+    az.plot_dist(region_idata_add, var_names=["β_w"])
+
     return
 
 
 @app.cell
 def _(az, region_idata):
-    az.plot_dist(region_idata, var_names=['β'], col_wrap=1)
+    az.plot_dist(region_idata, var_names=["β"], col_wrap=1)
+
     return
 
 
