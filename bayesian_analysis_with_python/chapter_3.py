@@ -10,6 +10,7 @@ def _():
     from itertools import combinations
     import numpy as np
     import polars as pl
+    import xarray as xr
     import matplotlib.pyplot as plt
     import pymc as pm
     import arviz as az
@@ -26,7 +27,7 @@ def _():
     plt.rcParams["figure.autolayout"] = True
     # sets default credible interval used by arviz
     az.rcParams["stats.ci_prob"] = 0.89
-    return Path, az, mo, np, pl, plt, pm, rng
+    return Path, az, mo, pl, plt, pm, rng, xr
 
 
 @app.cell
@@ -161,18 +162,6 @@ def _(az, cs_h_idata, cs_nh_idata, plt):
 
 
 @app.cell(column=1)
-def _(np):
-    N_samples = [30, 30, 30]
-    G_samples = [18, 18, 18]
-    group_idx = np.repeat(np.arange(len(N_samples)), N_samples)
-    data = []
-    for i in range(0, len(N_samples)):
-        data.extend(np.repeat([1, 0], [G_samples[i], N_samples[i]-G_samples[i]]))
-    data
-    return
-
-
-@app.cell
 def _():
     # pz.maxent(pz.Gamma(), 50, 200, 0.9)
     # pz.Gamma(6.94, 0.0549).plot_pdf(moments='md', pointinterval=True)
@@ -196,14 +185,16 @@ def _(Path, code_cat_vars, pl):
     fb_data = pl.read_csv(FB_PATH)
 
     pos_cats, pos_idx = code_cat_vars(fb_data, "position")
+    p_names = fb_data['name'].to_numpy()
+
     fb_data
-    return fb_data, pos_cats, pos_idx
+    return fb_data, p_names, pos_cats, pos_idx
 
 
 @app.cell
-def _(fb_data, pm, pos_cats, pos_idx, rng):
+def _(fb_data, p_names, pm, pos_cats, pos_idx, rng):
     def fn_fb_h_model():
-        coords = {"pos_cats": pos_cats, "pos_idx": pos_idx}
+        coords = {"pos_cats": pos_cats, "pos_idx": pos_idx, "player_name": p_names}
         with pm.Model(coords=coords) as fb_model:
             # Hyperpriors (glboal parameters - top league professional players avg and precision)
             mu = pm.Beta("mu", alpha=1.7, beta=5.8)
@@ -212,39 +203,64 @@ def _(fb_data, pm, pos_cats, pos_idx, rng):
             mu_p = pm.Beta("mu_p", mu=mu, nu=nu, dims="pos_cats")
             nu_p = pm.HalfNormal("nu_p", sigma=50, dims="pos_cats")
             # Parameter for each player
-            p = pm.Beta("p", mu=mu_p[pos_idx], nu=nu_p[pos_idx])
+            p = pm.Beta("p", mu=mu_p[pos_idx], nu=nu_p[pos_idx], dims="player_name")
             # likelihood
             # goals per shot = success_rate
             gps = pm.Binomial(
                 "gps", n=fb_data["shots"].to_numpy(), p=p, observed=fb_data["goals"]
             )
 
-            idata = pm.sample(3_000, random_seed=rng)
+            idata = pm.sample(2_000, random_seed=rng)
 
         return fb_model, idata
 
+    return (fn_fb_h_model,)
+
+
+@app.cell
+def _(fn_fb_h_model):
+    fb_h_model, fb_h_idata = fn_fb_h_model()
+    return (fb_h_idata,)
+
+
+@app.cell
+def _(az, fb_h_idata, xr):
+    # get the global mean. shape (chain, draw)=(4, 2000)
+    _global_mean = fb_h_idata.posterior["mu"]
+    # get the FW position mean. shape (chain, draw)=(4, 2000)
+    _fw_mean = fb_h_idata.posterior["mu_p"].sel(pos_cats="FW")
+    # get the mean for Messi. shape (chain, draw)=(4, 2000)
+    _messi_mean = fb_h_idata.posterior["p"].sel(player_name='Lionel Messi')
+
+    # label of each panel.
+    _panel_labels = ["Global Mean", "Forward Position Mean", "Messi Mean"]
+    # Remember that dims is the analogous to an Excel column and coords is a label for each row in that column
+    # Look at claude chat "Updating arviz posterior plots to version 1.2.0"
+    _panel_array = xr.DataArray(_panel_labels, dims="panel", name="panel")
+    # Concatenate the three arrays from teh posterior into a new dim called called "panel" with 3 labelled dimensions (_panel_labels).
+    # and make it a dataset where the data in in the "values" variable with dimensions (panel, chain, draw)=(3, 4, 2000)
+    _plot_df = xr.concat([_global_mean, _fw_mean, _messi_mean], dim=_panel_array).to_dataset(name="values")
+
+    _pc = az.plot_dist(
+        _plot_df,
+        var_names=["values"],
+        cols=['panel'],
+        col_wrap=1,
+        kind="kde",
+        point_estimate="mean",
+        ci_kind="hdi",
+        ci_prob=0.94,
+        backend="matplotlib",
+        figure_kwargs={"sharex": True, "figsize":(14, 7)}
+    )
+
+    _pc
     return
 
 
 @app.cell
-def _():
-    # fb_h_model, fb_h_idata = fn_fb_h_model()
-
-    # _, _axes = plt.subplots(3, 1, figsize=(14, 7.5), sharex=True)
-    # az.plot_posterior(fb_h_idata, var_names=["mu"], ax=_axes[0])
-    # az.plot_posterior(
-    #     fb_h_idata.posterior.sel(pos_cats="FW"), var_names=["mu_p"], ax=_axes[1]
-    # )
-    # az.plot_posterior(fb_h_idata.posterior.sel(p_dim_0=1457), var_names=["p"], ax=_axes[2])
-    # _axes[0].set_title("Global Mean")
-    # _axes[1].set_title("FW Pos Mean")
-    # _axes[2].set_title("Messi Mean")
-    return
-
-
-@app.cell
-def _():
-    # az.plot_forest(fb_h_idata, var_names=["mu_p"], combined=True)
+def _(az, fb_h_idata):
+    az.plot_forest(fb_h_idata, var_names=["mu_p"], combined=True, figure_kwargs={"figsize":(14, 7)})
     return
 
 
