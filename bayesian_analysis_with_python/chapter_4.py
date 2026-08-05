@@ -20,7 +20,7 @@
 
 import marimo
 
-__generated_with = "0.23.14"
+__generated_with = "0.23.15"
 app = marimo.App(width="columns")
 
 
@@ -139,40 +139,60 @@ def _():
 
 
 @app.cell
-def _(az, bikes, bikes_idata, np, pl, plt, xr):
-    def plot_bikes_posterior_lines(
-        dataf: pl.DataFrame = bikes, idata: az.InferenceData = bikes_idata, n: int = 50
-    ):
+def _(az, bikes_idata, bikes_temp_sort_idx):
+    az.hdi(bikes_idata.posterior['μ'])[bikes_temp_sort_idx][:, 0]
+    return
+
+
+@app.cell
+def _(az, bikes, bikes_idata, bikes_temp_sort_idx, np, pl, plt, xr):
+    def plot_bikes_posterior_lines(df: pl.DataFrame = bikes, idata: az.InferenceData = bikes_idata, n: int = 50):
+        fig, axs = plt.subplots(1, 2, figsize=(20, 7), sharey=True)
         # stacks chains/draws
         posterior = az.extract(idata, num_samples=n, group="posterior")
         # Create the x-values to use in the plot
         x_plot = xr.DataArray(
-            np.linspace(dataf["temperature"].min(), dataf["temperature"].max(), n),
+            np.linspace(df["temperature"].min(), df["temperature"].max(), n),
             dims="temps",
         )
         # MAP line
         mean_line = posterior["α"].mean() + posterior["β"].mean() * x_plot
         # Mean lines - not needed as μ wa saved in the inference data
         mean_lines = posterior["α"] + posterior["β"] * x_plot
+        # HDI for the mean line
+        hdi_mean = az.hdi(idata.posterior['μ'])
 
         # Main points
-        plt.scatter(x=dataf["temperature"], y=dataf["rented"], alpha=0.3, label="Observed")
+        axs[0].scatter(x=df["temperature"], y=df["rented"], alpha=0.3, label="Observed")
+        axs[1].scatter(x=df["temperature"], y=df["rented"], alpha=0.3, label="Observed")
 
         # Plot mean lines - handle label to avoid multiple legend entries for 'lines'
-        plt.plot(
+        axs[0].plot(
             x_plot,
             mean_lines.T,
             c="b",
             alpha=0.5,
             label=[None] * (n - 1) + ["Posterior Samples"],
         )
-
         # plot mean line
-        plt.plot(x_plot, mean_line, c="r", lw=5, label="Posterior Mean")
+        axs[0].plot(x_plot, mean_line, c="r", lw=5, label="Posterior Mean")
+        axs[0].set_title("Mean Posterior Uncertainty (Samples)")
+        axs[0].set_xlabel("Temperature")
+        axs[0].set_ylabel("Rented Bikes")
 
-        plt.title("Mean Posterior Uncertainty (Samples)")
-        plt.xlabel("Temperature")
-        plt.ylabel("Rented Bikes")
+        # HDI Plot
+        axs[1].plot(x_plot, mean_line, c="r", lw=5, label="Posterior Mean")
+        axs[1].fill_between(
+            df['temperature'][bikes_temp_sort_idx],
+            hdi_mean[:, 0][bikes_temp_sort_idx],
+            hdi_mean[:, 1][bikes_temp_sort_idx],
+            color="b",
+            alpha=0.7,
+            label="94% HDI for the mean"
+        )
+        axs[1].set_title("Mean Posterior Uncertainty (HDI)")
+        axs[1].set_xlabel("Temperature")
+    
         plt.legend()
 
         return plt.gca()
