@@ -52,8 +52,47 @@ def _():
 
 
 @app.cell
-def _():
-    return
+def _(az):
+    def add_boundary_reference(
+        pc: az.PlotCollection,
+        idata: az.InferenceData,
+        boundary_var: str = "bd",
+    ) -> az.PlotCollection:
+        """Overlay a decision-boundary HDI band and mean line on a plot_lm figure.
+
+        Parameters
+        ----------
+        pc : arviz_plots.PlotCollection
+            The PlotCollection returned by `az.plot_lm`.
+        idata : az.InferenceData
+            InferenceData containing `boundary_var` in its posterior group.
+        boundary_var : str, optional
+            Name of the decision-boundary variable, by default "bd".
+
+        Returns
+        -------
+        arviz_plots.PlotCollection
+            The same PlotCollection with the band and line added.
+
+        Raises
+        ------
+        KeyError
+            If `boundary_var` isn't found in the posterior group.
+        """
+        try:
+            var_mean = idata.constant_data["mean"]
+            bd_hdi = az.hdi(idata)
+            lo = bd_hdi[boundary_var].sel(ci_bound='lower') + var_mean
+            hi = bd_hdi[boundary_var].sel(ci_bound="upper") + var_mean
+            mean_bd = idata.posterior[boundary_var].mean(("chain","draw")) + var_mean
+        except KeyError as e:
+            raise KeyError(f"'{boundary_var}' not found in posterior group") from e
+
+        pc = az.add_bands(pc, values=[(lo, hi)], orientation="vertical")
+        pc = az.add_lines(pc, values=[mean_bd], orientation="vertical")
+        return pc
+
+    return (add_boundary_reference,)
 
 
 @app.cell(column=1, hide_code=True)
@@ -139,12 +178,6 @@ def _():
 
 
 @app.cell
-def _(az, bikes_idata, bikes_temp_sort_idx):
-    az.hdi(bikes_idata.posterior['μ'])[bikes_temp_sort_idx][:, 0]
-    return
-
-
-@app.cell
 def _(az, bikes, bikes_idata, bikes_temp_sort_idx, np, pl, plt, xr):
     def plot_bikes_posterior_lines(df: pl.DataFrame = bikes, idata: az.InferenceData = bikes_idata, n: int = 50):
         fig, axs = plt.subplots(1, 2, figsize=(20, 7), sharey=True)
@@ -192,7 +225,7 @@ def _(az, bikes, bikes_idata, bikes_temp_sort_idx, np, pl, plt, xr):
         )
         axs[1].set_title("Mean Posterior Uncertainty (HDI)")
         axs[1].set_xlabel("Temperature")
-    
+
         plt.legend()
 
         return plt.gca()
@@ -221,7 +254,7 @@ def _(az, bikes_idata):
         x="temperature",
         y="rented",
         ci_kind="hdi",
-        ci_prob=(0.5, 0.89),
+        ci_prob=(0.5, 0.94),
     )
     return
 
@@ -274,9 +307,7 @@ def _(bikes, bikes_neg_binom_idata, bikes_temp_sort_idx, plt):
 
     plt.plot(
         bikes["temperature"][bikes_temp_sort_idx],
-        bikes_neg_binom_idata["posterior"]["μ"].mean(("chain", "draw"))[
-            bikes_temp_sort_idx
-        ],
+        bikes_neg_binom_idata["posterior"]["μ"].mean(("chain", "draw"))[bikes_temp_sort_idx]
     )
     return
 
@@ -505,7 +536,6 @@ def _(Path, np, pl):
         howell_coords,
         howell_mean_height,
         iris,
-        iris_coords,
     )
 
 
@@ -784,20 +814,24 @@ def _(mo):
 
 
 @app.cell
-def _(iris, iris_coords, pl, pm, rng):
+def _(iris, np, pl, pm, rng):
     def iris_logit_model(predictor_cols: list[str], unique_species: list[str]=['setosa', 'versicolor']):
         filtered_iris = iris.filter(pl.col('species').is_in(unique_species))
         y = filtered_iris['species'].cast(pl.Enum(unique_species)).to_physical().to_numpy()
+    
+        # Create coordinates specifically for the filtered subset
+        subset_coords = {'obs_idx': np.arange(len(filtered_iris))}
 
         models = {}
         for col in predictor_cols:
             x = filtered_iris[col].to_numpy()
             x_c = x - x.mean()
 
-            with pm.Model(coords=iris_coords) as model:
+            with pm.Model(coords=subset_coords) as model:
                 # data
-                pred_var = pm.Data(f'{predictor_cols}', x, dims='obx_idx')
-                pred_var_c = pm.Data(f'{predictor_cols}_c', x_c, dims='obx_idx')
+                pred_var = pm.Data(col, x, dims='obs_idx')
+                var_mean = pm.Data("mean", x.mean())
+                pred_var_c = pm.Data(f'{col}_c', x_c, dims='obs_idx')
 
                 # Priors
                 a = pm.Normal('a', mu=0, sigma=1)
@@ -805,13 +839,13 @@ def _(iris, iris_coords, pl, pm, rng):
 
                 # Logistic Model
                 μ = a + pm.math.dot(pred_var_c, b)
-                θ = pm.Deterministic('θ', pm.math.sigmoid(μ))
+                θ = pm.Deterministic('θ', pm.math.sigmoid(μ), dims='obs_idx')
                 bd = pm.Deterministic('bd', -a/b)
 
                 # Likelihood
-                y_pred = pm.Bernoulli('y_pred', p=θ, observed=y, dims='obx_idx')
+                y_pred = pm.Bernoulli('y_pred', p=θ, observed=y, dims='obs_idx')
 
-                #sampling
+                # sampling
                 idata = pm.sample(random_seed=rng)
                 pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
 
@@ -823,21 +857,69 @@ def _(iris, iris_coords, pl, pm, rng):
 
 
 @app.cell
-def _(az, iris_models):
-    (
-        az.plot_lm(iris_models['model_sepal_length']),
-        az.plot_lm(iris_models['model_petal_length']),
-        az.plot_lm(iris_models['model_petal_width']),
+def _(add_boundary_reference, az, iris_models):
+    _pc = az.plot_lm(
+        iris_models['model_sepal_length'],
+        x='sepal_length',      # from constant_data — make sure this matches your pm.Data name!
+        y='θ',                 # plot the smooth probability, not raw 0/1 draws
+        y_obs='y_pred',         # still shows your observed data points
+        group='posterior',     # θ lives in posterior, not posterior_predictive
+        ci_kind='hdi',
+        ci_prob=0.94,
+        point_estimate='mean',
+        smooth=False,           # skip smoothing — θ is already a smooth sigmoid, no need to risk overshoot
     )
+
+    _pc = add_boundary_reference(_pc, iris_models['model_sepal_length'])
+    _pc
+    return
+
+
+@app.cell
+def _(add_boundary_reference, az, iris_models):
+    _pc = az.plot_lm(
+        iris_models['model_petal_length'],
+        x='petal_length',      # from constant_data — make sure this matches your pm.Data name!
+        y='θ',                 # plot the smooth probability, not raw 0/1 draws
+        y_obs='y_pred',         # still shows your observed data points
+        group='posterior',     # θ lives in posterior, not posterior_predictive
+        ci_kind='hdi',
+        ci_prob=0.94,
+        point_estimate='mean',
+        # smooth=False,           # skip smoothing — θ is already a smooth sigmoid, no need to risk overshoot
+    )
+
+    _pc = add_boundary_reference(_pc, iris_models['model_petal_length'])
+    _pc
+    return
+
+
+@app.cell
+def _(add_boundary_reference, az, iris_models):
+    _pc = az.plot_lm(
+        iris_models['model_petal_width'],
+        x='petal_width',      # from constant_data — make sure this matches your pm.Data name!
+        y='θ',                 # plot the smooth probability, not raw 0/1 draws
+        y_obs='y_pred',         # still shows your observed data points
+        group='posterior',     # θ lives in posterior, not posterior_predictive
+        ci_kind='hdi',
+        ci_prob=0.94,
+        point_estimate='mean',
+        # smooth=False,           # skip smoothing — θ is already a smooth sigmoid, no need to risk overshoot
+    )
+
+    _pc = add_boundary_reference(_pc, iris_models['model_petal_width'])
+    _pc
     return
 
 
 @app.cell
 def _(az, iris_models):
-    for model_name, idata in iris_models.items():
-        print(model_name)
-        print(az.summary(idata, var_names=['~θ']))
-        print('-'*50)
+    (
+        az.summary(iris_models['model_sepal_length'], var_names=['~θ']),
+        az.summary(iris_models['model_petal_length'], var_names=['~θ']),
+        az.summary(iris_models['model_petal_width'], var_names=['~θ']),
+    )
     return
 
 
