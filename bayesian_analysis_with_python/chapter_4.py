@@ -368,14 +368,18 @@ def _(Path, pl):
 
 
 @app.cell
+def _(babies):
+    babies.plot.point(x="month", y="length").properties(width="container")
+    return
+
+
+@app.cell
 def _(babies, np, pl, pm, rng):
     def fn_babies_var_std():
         coords = {"obs_idx": np.arange(len(babies))}
         with pm.Model(coords=coords) as var_std_model:
             # Data
-            month = pm.Data(
-                "month", babies["month"].cast(pl.Float32).to_numpy(), dims="obs_idx"
-            )
+            month = pm.Data("month", babies["month"].cast(pl.Float32).to_numpy(), dims="obs_idx")
             # Priors
             α = pm.Normal("α", mu=0, sigma=10)
             β = pm.Normal("β", mu=0, sigma=10)
@@ -393,9 +397,7 @@ def _(babies, np, pl, pm, rng):
                 dims="obs_idx",
             )
             idata = pm.sample(random_seed=rng)
-            pm.sample_posterior_predictive(
-                idata, extend_inferencedata=True, random_seed=rng
-            )
+            pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
         return var_std_model, idata
 
 
@@ -431,11 +433,11 @@ def _(az, babies_idata):
 def _(az, babies_idata):
     az.plot_lm(
         babies_idata,
-        ci_prob=[0.6, 0.89],
+        ci_prob=[0.6, 0.94],
         visuals={
-            "pe_line": {"color": "red"},
-            "ci_band": {"alpha": 0.4, "color": "green"},
-            "observed_scatter": {"marker": "C2"},
+            "pe_line": {"color": "black"},
+            "ci_band": {"alpha": 0.4, "color": "red"},
+            "observed_scatter": {"marker": "C0", "color":"blue"},
         },
     )
     return
@@ -479,6 +481,8 @@ def _(az, babies_idata, babies_model, plt, pm, rng):
     _ref_vals = babies_idata.predictions.dataset.quantile(
         [0.35, 0.5, 0.89], dim=["chain", "draw"])["length"].values.flatten()
 
+    print(_ref_vals)
+
     _pc = az.plot_dist(
         babies_idata, group="predictions", labeller=az.labels.DimCoordLabeller()
     )
@@ -486,11 +490,6 @@ def _(az, babies_idata, babies_model, plt, pm, rng):
     az.add_lines(_pc, _ref_vals)
 
     plt.gca()
-    return
-
-
-@app.cell
-def _():
     return
 
 
@@ -818,7 +817,7 @@ def _(iris, np, pl, pm, rng):
     def iris_logit_model(predictor_cols: list[str], unique_species: list[str]=['setosa', 'versicolor']):
         filtered_iris = iris.filter(pl.col('species').is_in(unique_species))
         y = filtered_iris['species'].cast(pl.Enum(unique_species)).to_physical().to_numpy()
-    
+
         # Create coordinates specifically for the filtered subset
         subset_coords = {'obs_idx': np.arange(len(filtered_iris))}
 
