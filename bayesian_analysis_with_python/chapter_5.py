@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.14"
+__generated_with = "0.23.15"
 app = marimo.App(width="columns")
 
 
@@ -15,26 +15,37 @@ def _(mo):
 @app.cell
 def _():
     import marimo as mo
-    import numpy as np
-    import xarray as xr
-    import polars as pl
-    import matplotlib.pyplot as plt
-    import altair as alt
-    import pymc as pm
+    from pathlib import Path
+
     import arviz as az
     import preliz as pz
-    from pathlib import Path
+
+    import altair as alt
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    import numpy as np
+    import scipy.stats as stats
+    import xarray as xr
+    import pymc as pm
+    import polars as pl
+
+    #######################################################
 
     RANDOM_SEED = 1523
     rng = np.random.default_rng(RANDOM_SEED)
 
     alt.theme.enable('fivethirtyeight')
-    # az.style.use("arviz-variat")
     plt.style.use("fivethirtyeight")
-    # Set default figure size to 14 inches wide by 7 inches tall
-    plt.rcParams["figure.figsize"] = (14, 7)
-    # Make the layout "tight" by deffault so labels don't overlap
+
+    # Set default figure size to 14 inches wide by 5 inches tall
+    plt.rcParams["figure.figsize"] = (12, 6)
+    # You can also set the DPI (dots per inch) for crisper images
+    plt.rcParams["figure.dpi"] = 100
+    # Make the layout "tight" by default so labels don't overlap
     plt.rcParams["figure.autolayout"] = True
+    # sets default credible interval used by arviz
+    az.rcParams["stats.ci_prob"] = 0.89
     return az, mo, np, plt, pm, rng
 
 
@@ -135,7 +146,7 @@ def _(pm, rng, x_c, y_c):
             μ = α + β * x_c[0]
 
             y_pred = pm.Normal('y_pred', mu=μ, sigma=σ, observed=y_c)
-            idata = pm.sample(2000, idata_kwargs={'log_likelihood': True}, random_seed=rng)
+            idata = pm.sample(2_000, idata_kwargs={'log_likelihood': True}, random_seed=rng)
             pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
         return model_linear, idata
 
@@ -149,13 +160,13 @@ def _(pm, rng, x_c, y_c):
             μ = α + pm.math.dot(β, x_c)
 
             y_pred = pm.Normal('y_pred', mu=μ, sigma=σ, observed=y_c)
-            idata = pm.sample(2000, idata_kwargs={'log_likelihood': True}, random_seed=rng)
+            idata = pm.sample(2_000, idata_kwargs={'log_likelihood': True}, random_seed=rng)
             pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
         return model_quadratic, idata
 
     l_5_1_model, l_5_1_idata = fn_5_1_linear()
     q_5_1_model, q_5_1_idata = fn_5_1_quadratic()
-    return l_5_1_idata, q_5_1_idata
+    return l_5_1_idata, l_5_1_model, q_5_1_idata
 
 
 @app.cell
@@ -183,8 +194,22 @@ def _(az, l_5_1_idata, np, plt, q_5_1_idata, x_c, y_c):
 
 
 @app.cell
+def _(az, l_5_1_idata):
+    l_5_1_idata.sel(chain=0, draw=[0, 1]), az.extract(l_5_1_idata)#.sel(sample=0)
+    return
+
+
+@app.cell
 def _(az, l_5_1_idata, q_5_1_idata):
-    az.plot_ppc_dist(l_5_1_idata, kind='kde'), az.plot_ppc_dist(q_5_1_idata, kind='kde')
+    _pc1 = az.plot_ppc_dist(l_5_1_idata, kind='kde', visuals={"observed_dist": {"color": "black", "label": "Observed"}})
+    _pc1.add_title("Linear model")
+    _pc1.viz["figure"].item().legend()  # grabs the labelled lines automatically
+
+    _pc2 = az.plot_ppc_dist(q_5_1_idata, kind='kde', visuals={"observed_dist": {"color": "black", "label": "Observed"}})
+    _pc2.add_title("Quadratic model")
+    _pc2.viz["figure"].item().legend()  # grabs the labelled lines automatically
+
+    _pc1, _pc2
     return
 
 
@@ -195,17 +220,28 @@ def _(l_5_1_idata, plot_ppc_tstats, q_5_1_idata):
         "Quadratic": q_5_1_idata,
     }
 
-    plot_ppc_tstats(models)
+    plot_ppc_tstats(models, t_stat='iqr')
+    return (models,)
+
+
+@app.cell(column=1)
+def _(az, models):
+    az.compare(models)
     return
 
 
 @app.cell
-def _():
+def _(az, models):
+    az.plot_compare(az.compare(models), figure_kwargs={'figsize':(12, 5)})
     return
 
 
-@app.cell(column=1)
-def _():
+@app.cell
+def _(az, l_5_1_idata, l_5_1_model, pm, rng):
+    with l_5_1_model:
+        l_5_1_idata.update(pm.sample_prior_predictive(random_seed=rng))
+
+    az.plot_bf(l_5_1_idata, var_names=['α'], ref_val=0, figure_kwargs={"figsize":(12, 5)})
     return
 
 
