@@ -21,7 +21,6 @@ def _():
     import xarray as xr
     import pymc as pm
     import bambi as bmb
-    import pandas as pd
     import polars as pl
 
     #######################################################
@@ -40,13 +39,13 @@ def _():
     plt.rcParams["figure.autolayout"] = True
     # sets default credible interval used by arviz
     az.rcParams["stats.ci_prob"] = 0.89
-    return Path, bmb, mo, np, pd, pl, pm, rng
+    return Path, bmb, mo, np, pl, plt, pm, rng
 
 
 @app.cell
-def _(np, pd):
+def _(np, pl):
     _SIZE = 117
-    data = pd.DataFrame(
+    data = pl.DataFrame(
         {
             "y": np.random.normal(size=_SIZE),
             "x": np.random.normal(size=_SIZE),
@@ -64,7 +63,7 @@ def _(data, pm):
         β = pm.Normal('β', 0, 1)
         σ = pm.HalfNormal('σ', 1)
 
-        μ = α + β * data['x']
+        μ = α + β * data['x'].to_numpy()
 
         y = pm.Normal('y', μ, σ, observed=data['y'])
         # pymc_model_idata = pm.sample(1_000, random_seed=rng)
@@ -73,7 +72,7 @@ def _(data, pm):
 
 @app.cell
 def _(bmb, data):
-    bmb.Model("y ~ x", data)
+    bmb.Model("y ~ x", data.to_pandas())
     return
 
 
@@ -83,7 +82,7 @@ def _(bmb, data):
               "sigma": bmb.Prior("Gamma",  mu=1, sigma=2),
               }
  
-    bmb.Model("y ~ x", data, priors=priors)
+    bmb.Model("y ~ x", data.to_pandas(), priors=priors)
     return
 
 
@@ -91,7 +90,7 @@ def _(bmb, data):
 def _(bmb, data):
     # Partially pooled (hierarchical) model.
     # Allows each group to have it's own mean, but makes sure they all come from a same distribution.
-    model_h = bmb.Model("y ~ x + z + (x | g)", data)
+    model_h = bmb.Model("y ~ x + z + (x | g)", data.to_pandas())
     model_h
     return (model_h,)
 
@@ -107,6 +106,14 @@ def _(model_h):
 def _(mo):
     mo.md(r"""
     # Bikes Example - Bambi Style
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Bikes Example - Temperature
     """)
     return
 
@@ -139,16 +146,16 @@ def _(bikes, bmb, np, pm, rng):
 
             idata = pm.sample(random_seed=rng)
             pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
-        
+
             return neg_binom_model, idata
 
     ###################################################
 
     # "Same" as above. Priors are different.
     model_t = bmb.Model("rented ~ temperature", bikes.to_pandas(), family="negativebinomial")
-    idata_t = model_t.fit()
+    idata_t = model_t.fit(random_seed=rng)
     model_t
-    return (model_t,)
+    return idata_t, model_t
 
 
 @app.cell
@@ -160,6 +167,90 @@ def _(model_t):
 @app.cell
 def _(model_t):
     model_t.plot_priors(figsize=(12, 5), col_wrap=2)
+    return
+
+
+@app.cell
+def _(bikes, bmb, idata_t, model_t, plt):
+    _fig, _axes = plt.subplots(1, 2, sharey=True, figsize=(12, 5))
+
+    _axes[0].scatter(bikes['temperature'], bikes['rented'], s=10)
+    _axes[1].scatter(bikes['temperature'], bikes['rented'], s=10)
+
+    _p1 = bmb.interpret.plot_predictions(
+        model_t,
+        idata_t,
+        conditional="temperature",
+        fig_kwargs={
+            "xlabel": "Temperature",
+            "ylabel": "Rented",
+            "title": "Mean"
+        }
+    ).limit(y=(-100, 1050))
+
+    _p2 = bmb.interpret.plot_predictions(
+        model_t,
+        idata_t,
+        conditional="temperature",
+        target='rented',
+        fig_kwargs={
+            "xlabel": "Temperature",
+            "ylabel": "Rented",
+            "title": "Predictions"
+        }
+    )
+
+    _p1.on(_axes[0]).layout(engine="tight").plot()
+    _p2.on(_axes[1]).layout(engine="tight").plot().show()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Bikes Example - Temperature + Humidity
+    """)
+    return
+
+
+@app.cell
+def _(bikes, bmb, rng):
+    model_th = bmb.Model("rented ~ temperature + humidity", bikes.to_pandas(), family="negativebinomial")
+    idata_th = model_th.fit(random_seed=rng)
+    return idata_th, model_th
+
+
+@app.cell
+def _(model_th):
+    model_th.graph()
+    return
+
+
+@app.cell
+def _(bikes, bmb, idata_th, model_th, np):
+    _conditional = {
+        "temperature": np.linspace(bikes["temperature"].min(), bikes["temperature"].max(), 50),
+        "humidity": [0.18, 0.5, 0.635, 0.78, 1.0],
+    }
+
+    _p = bmb.interpret.plot_predictions(
+        model_th,
+        idata_th,
+        conditional=_conditional,
+        # target='rented',
+        subplot_kwargs={
+            "main": "temperature",
+            "group": None,
+            "panel": "humidity"
+        },
+        fig_kwargs={
+            "theme": {"figure.figsize": (10, 6)},
+            "wrap": 3,
+            "title": lambda h: f"humidity = {h}",
+        },
+    )
+
+    _p.share(x=False).layout(size=(14, 7)).show()
     return
 
 
