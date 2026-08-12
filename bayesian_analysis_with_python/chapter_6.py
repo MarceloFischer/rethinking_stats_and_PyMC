@@ -219,10 +219,10 @@ def _(mo):
 
 
 @app.cell
-def _(bikes, bmb):
+def _(bikes, bmb, rng):
     model_th = bmb.Model("rented ~ temperature + humidity", bikes.to_pandas(), family="negativebinomial")
-    # idata_th = model_th.fit(random_seed=rng)
-    return (model_th,)
+    idata_th = model_th.fit(random_seed=rng)
+    return idata_th, model_th
 
 
 @app.cell
@@ -253,13 +253,16 @@ def _(bikes, bmb, idata_th, mo, model_th, np):
             "panel": "humidity"
         },
         fig_kwargs={
-            "theme": {"figure.figsize": (10, 6)},
             "wrap": 3,
             "title": lambda h: f"humidity = {h}",
         },
     )
 
-    _p.share(x=False).layout(size=(14, 7)).show()
+    _p.share(
+        x=False
+    ).layout(
+        size=(14, 7)
+    ).show()
     return
 
 
@@ -349,10 +352,10 @@ def _(az, idata_babies, mo):
     return
 
 
-@app.cell(hide_code=True)
+@app.cell(column=3, hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Models with Categories - Bambi Style
+    # Penguins - Bambi Style
     """)
     return
 
@@ -374,6 +377,14 @@ def _(Path, alt, mo, pl):
 
     mo.ui.altair_chart(_c)
     return (penguins,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Models with Categories
+    """)
+    return
 
 
 @app.cell
@@ -425,7 +436,68 @@ def _(bmb, idata_p, mo, model_p, plt):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Interactions
+    """)
+    return
+
+
 @app.cell
+def _(bmb, penguins, rng):
+    model_int = bmb.Model("body_mass ~ bill_length + bill_depth + bill_length:bill_depth", data=penguins.to_pandas(), dropna=True)
+    idata_int = model_int.fit(random_seed=rng)
+    return idata_int, model_int
+
+
+@app.cell
+def _(az, idata_int):
+    az.summary(idata_int)
+    return
+
+
+@app.cell
+def _(bmb, idata_int, model_int, np, penguins, plt):
+    _fig, _ax = plt.subplots(figsize=(10, 5))
+
+    _conditional = {
+        "bill_depth": np.linspace(penguins["bill_depth"].min(), penguins["bill_depth"].max(), 50),
+        "bill_length": [3.21, 3.95, 4.45, 4.86, 5.96],
+    }
+
+    _p = bmb.interpret.plot_predictions(
+        model_int,
+        idata_int,
+        conditional=_conditional,
+        # target='rented',
+        subplot_kwargs={
+            "main": "bill_depth",
+            "group": "bill_length",
+            # "panel": "bill_length"
+        },
+        fig_kwargs={
+            "xlabel": "Bill Depth (mm)",
+            "ylabel": "Body Mass (g)"
+        },
+    )
+
+    _p.on(_ax).plot()
+    _fig.legend()
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell(column=4)
+def _():
+    return
+
+
+@app.cell(column=5)
 def _():
     return
 
