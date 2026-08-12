@@ -39,7 +39,7 @@ def _():
     plt.rcParams["figure.autolayout"] = True
     # sets default credible interval used by arviz
     az.rcParams["stats.ci_prob"] = 0.89
-    return Path, bmb, mo, np, pl, plt, pm, rng
+    return Path, alt, az, bmb, mo, np, pl, plt, pm, rng
 
 
 @app.cell
@@ -153,25 +153,30 @@ def _(bikes, bmb, np, pm, rng):
 
     # "Same" as above. Priors are different.
     model_t = bmb.Model("rented ~ temperature", bikes.to_pandas(), family="negativebinomial")
-    idata_t = model_t.fit(random_seed=rng)
+    # idata_t = model_t.fit(random_seed=rng)
     model_t
-    return idata_t, model_t
+    return (model_t,)
 
 
 @app.cell
-def _(model_t):
+def _(mo, model_t):
+    mo.stop("idata_t" not in dir(), mo.md("Fit model_t to continue"))
     model_t.graph()
     return
 
 
 @app.cell
-def _(model_t):
+def _(mo, model_t):
+    mo.stop("idata_t" not in dir(), mo.md("Fit model_t to continue"))
+
     model_t.plot_priors(figsize=(12, 5), col_wrap=2)
     return
 
 
 @app.cell
-def _(bikes, bmb, idata_t, model_t, plt):
+def _(bikes, bmb, idata_t, mo, model_t, plt):
+    mo.stop("idata_t" not in dir(), mo.md("Fit model_t to continue"))
+
     _fig, _axes = plt.subplots(1, 2, sharey=True, figsize=(12, 5))
 
     _axes[0].scatter(bikes['temperature'], bikes['rented'], s=10)
@@ -214,20 +219,24 @@ def _(mo):
 
 
 @app.cell
-def _(bikes, bmb, rng):
+def _(bikes, bmb):
     model_th = bmb.Model("rented ~ temperature + humidity", bikes.to_pandas(), family="negativebinomial")
-    idata_th = model_th.fit(random_seed=rng)
-    return idata_th, model_th
+    # idata_th = model_th.fit(random_seed=rng)
+    return (model_th,)
 
 
 @app.cell
-def _(model_th):
+def _(mo, model_th):
+    mo.stop("idata_th" not in dir(), mo.md("Fit model_th to continue"))
+
     model_th.graph()
     return
 
 
 @app.cell
-def _(bikes, bmb, idata_th, model_th, np):
+def _(bikes, bmb, idata_th, mo, model_th, np):
+    mo.stop("idata_th" not in dir(), mo.md("Fit model_th to continue"))
+
     _conditional = {
         "temperature": np.linspace(bikes["temperature"].min(), bikes["temperature"].max(), 50),
         "humidity": [0.18, 0.5, 0.635, 0.78, 1.0],
@@ -251,6 +260,173 @@ def _(bikes, bmb, idata_th, model_th, np):
     )
 
     _p.share(x=False).layout(size=(14, 7)).show()
+    return
+
+
+@app.cell(column=2, hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Distributional Models
+
+    Models that also allow parameters to vary. For example, allow the variance also to be a linear function (variable variance)
+    """)
+    return
+
+
+@app.cell
+def _(Path, pl):
+    BABIES_PATH = Path(__file__).parent.parent / "data" / "babies.csv"
+
+    babies = pl.read_csv(BABIES_PATH)
+    # Done so that bambi can plot month as a continuous variable (line, and not dots)
+    babies = babies.with_columns(month = pl.col("month").cast(pl.Float64))
+    babies.head()
+    return (babies,)
+
+
+@app.cell
+def _(babies, bmb):
+    _formula = bmb.Formula(
+        "length ~ np.sqrt(month)",
+        "sigma ~ month"
+    )
+
+    model_babies = bmb.Model(_formula, babies.to_pandas())
+    # idata_babies = model_babies.fit(random_seed=rng)
+
+    # model_babies.plot_priors(col_wrap=2, figsize=(12, 6))
+    return (model_babies,)
+
+
+@app.cell
+def _(babies, bmb, idata_babies, mo, model_babies, plt):
+    mo.stop("idata_babies" not in dir(), mo.md("Fit model_babies to continue"))
+
+    _fig, _axes = plt.subplots(figsize=(12, 5))
+
+    _axes.scatter(babies['month'], babies['length'], s=10, c='black')
+
+    _p = bmb.interpret.plot_predictions(
+            model_babies,
+            idata_babies,
+            conditional="month",
+            target="length",
+            fig_kwargs={
+                "xlabel": "Month",
+                "ylabel": "Length",
+                "title": "Predictions"
+            },
+        prob=[0.65, 0.94]
+        )
+
+    _p.on(_axes).layout(engine="tight").plot().show()
+    return
+
+
+@app.cell
+def _(idata_babies, mo, model_babies, pl):
+    mo.stop("idata_babies" not in dir(), mo.md("Fit model_babies to continue"))
+
+    # Make a prediction for the lenght of a baby with 0.5 months old. This creates a "posterior_predictive" group in the idata object.
+    model_babies.predict(idata_babies, kind="response", data=pl.DataFrame({"month":[0.5]}).to_pandas())
+    return
+
+
+@app.cell
+def _(az, idata_babies, mo):
+    mo.stop("idata_babies" not in dir(), mo.md("Fit model_babies to continue"))
+
+    _ref = 52.5
+
+    _pc = az.plot_dist(idata_babies, group="posterior_predictive")
+
+    _percentile = (idata_babies.posterior_predictive["length"].stack(sample=("chain", "draw")) <= _ref).mean() * 100
+    print(f"Percentile of the reference value ({_ref}) is {_percentile.item()}")
+
+    az.add_lines(_pc, _ref)
+
+    _pc.show()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Models with Categories - Bambi Style
+    """)
+    return
+
+
+@app.cell
+def _(Path, alt, mo, pl):
+    PENGUINS_PATH = Path(__file__).parent.parent / "data" / "penguins.csv"
+
+    penguins = pl.read_csv(PENGUINS_PATH)
+
+    _c = alt.Chart(penguins).mark_point().encode(
+        x=alt.X("bill_length:Q", scale=alt.Scale(domain=(2.9, 6.1))),
+        y=alt.Y("body_mass:Q", scale=alt.Scale(domain=(2, 6.4))),
+        color="species:N",
+    ).properties(
+        width='container',
+        title="Bill Length vs Body Mass by Species"
+    )
+
+    mo.ui.altair_chart(_c)
+    return (penguins,)
+
+
+@app.cell
+def _(bmb, penguins):
+    #  0 + bill_length + species would create one slope and one intercept for each category of species.
+    # Each species coefficient would now be the mean body mass of that species (holding bill_length constant)
+    model_p = bmb.Model("body_mass ~ bill_length + species", data=penguins.to_pandas(), dropna=True)
+    # idata_p = model_p.fit(random_seed=rng)
+
+    model_p
+    return (model_p,)
+
+
+@app.cell
+def _(az, idata_p, mo):
+    mo.stop("idata_p" not in dir(), mo.md("Fit model_p to continue"))
+
+    az.plot_trace_dist(idata_p)
+    return
+
+
+@app.cell
+def _(az, idata_p, mo):
+    mo.stop("idata_p" not in dir(), mo.md("Fit model_p to continue"))
+
+    az.plot_forest(idata_p, combined=True, figure_kwargs={'figsize':(12,5)})
+    return
+
+
+@app.cell
+def _(bmb, idata_p, mo, model_p, plt):
+    mo.stop("idata_p" not in dir(), mo.md("Fit model_p to continue"))
+
+    _fig, _ax = plt.subplots(figsize=(10, 5))
+
+    _p = bmb.interpret.plot_predictions(
+        model_p,
+        idata_p,
+        conditional=['bill_length', 'species'],
+        fig_kwargs={
+            "xlabel": "Bill Length (mm)",
+            "ylabel": "Body Mass (g)",
+            "title": "Body Mass Linear Model on Bill Length and Species"
+        }
+    )
+
+    _p.on(_ax).plot()
+    _fig.legend()
+    return
+
+
+@app.cell
+def _():
     return
 
 
