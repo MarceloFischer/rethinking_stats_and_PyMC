@@ -4,7 +4,15 @@ __generated_with = "0.24.0"
 app = marimo.App(width="columns")
 
 
-@app.cell(column=0)
+@app.cell(column=0, hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Imports
+    """)
+    return
+
+
+@app.cell
 def _():
     import marimo as mo
     from pathlib import Path
@@ -23,6 +31,8 @@ def _():
     import bambi as bmb
     import polars as pl
 
+    import kulprit as kpt
+
     #######################################################
 
     RANDOM_SEED = 1523
@@ -39,7 +49,7 @@ def _():
     plt.rcParams["figure.autolayout"] = True
     # sets default credible interval used by arviz
     az.rcParams["stats.ci_prob"] = 0.89
-    return Path, alt, az, bmb, mo, np, pl, plt, pm, rng
+    return Path, alt, az, bmb, kpt, mo, np, pl, plt, pm, rng
 
 
 @app.cell
@@ -396,14 +406,14 @@ def _(mo):
 
 
 @app.cell
-def _(bmb, penguins, rng):
+def _(bmb, penguins):
     #  0 + bill_length + species would create one slope and one intercept for each category of species.
     # Each species coefficient would now be the mean body mass of that species (holding bill_length constant)
     model_p = bmb.Model("body_mass ~ bill_length + species", data=penguins.to_pandas(), dropna=True)
-    idata_p = model_p.fit(random_seed=rng)
+    # idata_p = model_p.fit(random_seed=rng)
 
     model_p
-    return idata_p, model_p
+    return (model_p,)
 
 
 @app.cell
@@ -616,6 +626,46 @@ def _():
     #         pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
     
     #     return model, idata
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Kulprit
+    """)
+    return
+
+
+@app.cell
+def _(Path, pl):
+    BODY_FAT_PATH = Path(__file__).parent.parent / "data" / "body_fat.csv"
+
+    body_fat = pl.read_csv(BODY_FAT_PATH)
+    return (body_fat,)
+
+
+@app.cell
+def _(bmb, body_fat, rng):
+    body_fat_model = bmb.Model("siri ~ age + weight + height + abdomen + thigh + wrist", data=body_fat.to_pandas())
+    body_fat_idata = body_fat_model.fit(random_seed=rng, idata_kwargs={'log_likelihood': True})
+    return body_fat_idata, body_fat_model
+
+
+@app.cell
+def _(body_fat_idata, body_fat_model, kpt, mo):
+    mo.stop("body_fat_idata" not in dir(), mo.md("Fit body_fat_model to continue"))
+    body_fat_ppi = kpt.ProjectionPredictive(body_fat_model, body_fat_idata)
+    body_fat_ppi.project()
+    return (body_fat_ppi,)
+
+
+@app.cell
+def _(body_fat_ppi, kpt):
+    kpt.plot_compare(
+        body_fat_ppi.compare(),
+        figure_kwargs={'figsize':(12, 5)}
+    )
     return
 
 
