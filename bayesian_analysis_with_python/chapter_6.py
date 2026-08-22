@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.15"
+__generated_with = "0.24.0"
 app = marimo.App(width="columns")
 
 
@@ -219,10 +219,10 @@ def _(mo):
 
 
 @app.cell
-def _(bikes, bmb, rng):
+def _(bikes, bmb):
     model_th = bmb.Model("rented ~ temperature + humidity", bikes.to_pandas(), family="negativebinomial")
-    idata_th = model_th.fit(random_seed=rng)
-    return idata_th, model_th
+    # idata_th = model_th.fit(random_seed=rng)
+    return (model_th,)
 
 
 @app.cell
@@ -364,15 +364,23 @@ def _(mo):
 def _(Path, alt, mo, pl):
     PENGUINS_PATH = Path(__file__).parent.parent / "data" / "penguins.csv"
 
-    penguins = pl.read_csv(PENGUINS_PATH)
+    penguins = pl.read_csv(PENGUINS_PATH).drop_nulls()
 
-    _c = alt.Chart(penguins).mark_point().encode(
-        x=alt.X("bill_length:Q", scale=alt.Scale(domain=(2.9, 6.1))),
-        y=alt.Y("body_mass:Q", scale=alt.Scale(domain=(2, 6.4))),
-        color="species:N",
-    ).properties(
-        width='container',
-        title="Bill Length vs Body Mass by Species"
+    penguins_spe = penguins['species'].unique().to_numpy()
+    penguins_spe_idx = penguins['species'].cast(pl.Enum(penguins_spe)).to_physical().to_numpy()
+
+    _c = (
+        alt.Chart(penguins)
+        .mark_point()
+        .encode(
+            x=alt.X("bill_length:Q", scale=alt.Scale(domain=(2.9, 6.1)), axis=alt.Axis(labelFontSize=14)),
+            y=alt.Y("body_mass:Q", scale=alt.Scale(domain=(2, 6.4)), axis=alt.Axis(labelFontSize=14)),
+            color="species:N",
+        )
+        .properties(
+            width='container',
+            title="Bill Length vs Body Mass by Species"
+        )
     )
 
     mo.ui.altair_chart(_c)
@@ -388,14 +396,14 @@ def _(mo):
 
 
 @app.cell
-def _(bmb, penguins):
+def _(bmb, penguins, rng):
     #  0 + bill_length + species would create one slope and one intercept for each category of species.
     # Each species coefficient would now be the mean body mass of that species (holding bill_length constant)
     model_p = bmb.Model("body_mass ~ bill_length + species", data=penguins.to_pandas(), dropna=True)
-    # idata_p = model_p.fit(random_seed=rng)
+    idata_p = model_p.fit(random_seed=rng)
 
     model_p
-    return (model_p,)
+    return idata_p, model_p
 
 
 @app.cell
@@ -439,6 +447,63 @@ def _(bmb, idata_p, mo, model_p, plt):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ## Models with Categories - Hierarchical
+    """)
+    return
+
+
+@app.cell
+def _(bmb, penguins):
+    #  0 + bill_length + species would create one slope and one intercept for each category of species.
+    # Each species coefficient would now be the mean body mass of that species (holding bill_length constant)
+    model_p_hie = bmb.Model("body_mass ~ (bill_length|species)", data=penguins.to_pandas(), dropna=True)
+    # idata_p_hie = model_p_hie.fit(random_seed=rng, target_accept=0.95)
+
+    model_p_hie
+    return (model_p_hie,)
+
+
+@app.cell
+def _(az, idata_p_hie, mo):
+    mo.stop("idata_p_hie" not in dir(), mo.md("Fit model_p_hie to continue"))
+
+    az.plot_trace_dist(idata_p_hie)
+    return
+
+
+@app.cell
+def _(az, idata_p_hie, mo):
+    mo.stop("idata_p_hie" not in dir(), mo.md("Fit model_p_hie to continue"))
+
+    az.plot_forest(idata_p_hie, combined=True, figure_kwargs={'figsize':(12,5)})
+    return
+
+
+@app.cell
+def _(bmb, idata_p_hie, mo, model_p_hie, plt):
+    mo.stop("idata_p_hie" not in dir(), mo.md("Fit model_p_hie to continue"))
+
+    _fig, _ax = plt.subplots(figsize=(10, 5))
+
+    _p = bmb.interpret.plot_predictions(
+        model_p_hie,
+        idata_p_hie,
+        conditional=['bill_length', 'species'],
+        fig_kwargs={
+            "xlabel": "Bill Length (mm)",
+            "ylabel": "Body Mass (g)",
+            "title": "Body Mass Linear Model on Bill Length and Species"
+        }
+    )
+
+    _p.on(_ax).plot()
+    _fig.legend()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ## Interactions
     """)
     return
@@ -446,19 +511,22 @@ def _(mo):
 
 @app.cell
 def _(bmb, penguins, rng):
-    model_int = bmb.Model("body_mass ~ bill_length + bill_depth + bill_length:bill_depth", data=penguins.to_pandas(), dropna=True)
+    # model_int = bmb.Model("body_mass ~ bill_length + bill_depth + bill_length:bill_depth", data=penguins.to_pandas(), dropna=True)
+    model_int = bmb.Model("body_mass ~ scale(bill_length) * scale(bill_depth)", data=penguins.to_pandas(), dropna=True)
     idata_int = model_int.fit(random_seed=rng)
     return idata_int, model_int
 
 
 @app.cell
-def _(az, idata_int):
-    az.summary(idata_int)
+def _(az, idata_int, mo):
+    mo.stop("idata_int" not in dir(), mo.md("Fit model_int to continue"))
+    az.summary(idata_int).round(2)
     return
 
 
 @app.cell
-def _(bmb, idata_int, model_int, np, penguins, plt):
+def _(bmb, idata_int, mo, model_int, np, penguins, plt):
+    mo.stop("idata_int" not in dir(), mo.md("Fit model_int to continue"))
     _fig, _ax = plt.subplots(figsize=(10, 5))
 
     _conditional = {
@@ -488,16 +556,80 @@ def _(bmb, idata_int, model_int, np, penguins, plt):
 
 
 @app.cell
-def _():
+def _(bmb, idata_int, model_int):
+    bmb.interpret.plot_comparisons(
+        model=model_int,
+        idata=idata_int,
+        contrast={'bill_depth':[1.4, 1.8]},
+        conditional={'bill_length':[3.5, 4.5, 5.5]},
+    ).show()
+    return
+
+
+@app.cell
+def _(bmb, idata_int, model_int):
+    bmb.interpret.plot_slopes(
+        model=model_int,
+        idata=idata_int,
+        wrt={'bill_depth':1.8},
+        conditional={'bill_length':[3.5, 4.5, 5.5]},
+    ).show()
     return
 
 
 @app.cell(column=4)
 def _():
+    # this model is not equivalent to bmb.Model("body_mass ~ (bill_length|species)", data=penguins.to_pandas(), dropna=True)
+    # The bambi model has correlation between intercepts and slopes for each species. The PyMC model below has an independent slope
+    # and intercept for each species. They have different modelling assumptions.
+    # Look at "PyMC hierarchical model vs Bambi formula equivalence" Claude chat for further clarifications.
+
+    # def penguin_hier_pymc():
+    #     coords = {
+    #         "obs_id": np.arange(len(penguins)),
+    #         "penguins_spe": penguins_spe,
+    #     }
+
+    #     centered_bill_length = penguins['bill_length'].to_numpy() - penguins['bill_length'].mean()
+
+    #     with pm.Model(coords=coords) as model:
+    #         # Data
+    #         bill_len = pm.Data('bill_length', centered_bill_length, dims='obs_id')
+    #         # Hyperpriors
+    #         μ_line = pm.Normal('μ_line', mu=4.5, sigma=1)
+    #         σ_line = pm.HalfNormal('σ_line', sigma=2)
+    #         σ = pm.Exponential('σ', 1, dims='penguins_spe')
+    #         # Priors
+    #         α = pm.Normal('α', mu=μ_line, sigma=σ_line, dims='penguins_spe')
+    #         β = pm.Normal('β', mu=μ_line, sigma=σ_line, dims='penguins_spe')
+    #         # Mean
+    #         μ = pm.Deterministic('μ', α[penguins_spe_idx] + β[penguins_spe_idx] * bill_len, dims='obs_id')
+    #         # Likelihood
+    #         body_mass = pm.Normal(
+    #             'body_mass',
+    #             mu=μ,
+    #             sigma=σ[penguins_spe_idx],
+    #             observed=penguins['body_mass'].to_numpy(),
+    #             dims='obs_id'
+    #         )
+    #         idata = pm.sample(1_000, random_seed=rng)
+    #         pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
+    
+    #     return model, idata
+    return
+
+
+@app.cell
+def _():
     return
 
 
 @app.cell(column=5)
+def _():
+    return
+
+
+@app.cell
 def _():
     return
 
