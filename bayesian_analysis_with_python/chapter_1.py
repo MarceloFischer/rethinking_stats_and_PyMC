@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.8"
+__generated_with = "0.24.0"
 app = marimo.App(width="columns")
 
 
@@ -60,8 +60,8 @@ def _(plt, pz):
 
 @app.cell
 def _(mo):
-    mu_slider = mo.ui.slider(-10, 10, step=0.1, show_value=True, label="mu")
-    alpha_slider = mo.ui.slider(-10, 10, step=0.1, show_value=True, label="alpha")
+    mu_slider = mo.ui.slider(-10, 10, step=0.1, value=0, show_value=True, label="mu")
+    alpha_slider = mo.ui.slider(-10, 10, step=0.1, value=0, show_value=True, label="alpha")
     sigma_slider = mo.ui.slider(0.1, 10, step=0.1, show_value=True, label="sigma")
     return alpha_slider, mu_slider, sigma_slider
 
