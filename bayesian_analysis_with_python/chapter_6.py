@@ -133,6 +133,7 @@ def _(Path, pl):
     BIKE_PATH = Path(__file__).parent.parent / "data" / "bikes.csv"
 
     bikes = pl.read_csv(BIKE_PATH)
+    bikes = bikes.with_columns(hour = pl.col("hour").cast(pl.Float64))
 
     bikes
     return (bikes,)
@@ -624,7 +625,7 @@ def _():
     #         )
     #         idata = pm.sample(1_000, random_seed=rng)
     #         pm.sample_posterior_predictive(idata, extend_inferencedata=True, random_seed=rng)
-    
+
     #     return model, idata
     return
 
@@ -674,13 +675,168 @@ def _():
     return
 
 
-@app.cell(column=5)
+@app.cell(column=5, hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Exercises
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercise 2
+
+    Apply what you learned in the previous point and specify a HalfNormal prior for the slope of model_t.
+    """)
+    return
+
+
+@app.cell
+def _(bikes, bmb):
+    def ex2():
+        priors = {
+            'temperature': bmb.Prior('HalfNormal', sigma=1)
+        }
+    
+        model_t = bmb.Model("rented ~ temperature", bikes.to_pandas(), priors=priors, family="negativebinomial")
+        # idata_t = model_t.fit(random_seed=rng)
+        return model_t
+
+    ex2()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercise 3
+
+    Define a model like model_poly4, but using raw polynomials, compare the coefficients and the mean fit of both models.
+    """)
+    return
+
+
+@app.cell
+def _(bikes, bmb, rng):
+    def ex3():
+        model_poly4 = bmb.Model(
+            "rented ~ poly(scale(hour), degree=4)",
+            bikes.to_pandas(), family="negativebinomial"
+        )
+        model_poly4_raw = bmb.Model(
+            "rented ~ scale(hour) + {scale(hour) ** 2} + {scale(hour) ** 3} + {scale(hour) ** 4}",
+            bikes.to_pandas(), family="negativebinomial"
+        )
+
+        idata_poly4 = model_poly4.fit(random_seed=rng, idata_kwargs={'log_likelihood': True})
+        idata_poly4_raw = model_poly4_raw.fit(random_seed=rng, idata_kwargs={'log_likelihood': True})
+
+        return model_poly4, idata_poly4, model_poly4_raw, idata_poly4_raw
+
+    # model_poly4, idata_poly4, model_poly4_raw, idata_poly4_raw = ex3()
+    return
+
+
+@app.cell
+def _(az, idata_poly4, idata_poly4_raw, mo):
+    mo.stop("idata_poly4" not in dir(), mo.md("Fit model_poly4 to continue"))
+
+    az.compare({
+        'idata_poly4': idata_poly4,
+        "idata_poly4_raw": idata_poly4_raw
+    })
+    return
+
+
+@app.cell
+def _(az, idata_poly4, idata_poly4_raw, mo):
+    mo.stop("idata_poly4" not in dir(), mo.md("Fit model_poly4 to continue"))
+    az.plot_dist(idata_poly4, figure_kwargs={'figsize':(12, 5)}), az.plot_dist(idata_poly4_raw, figure_kwargs={'figsize':(12, 5)})
+    return
+
+
+@app.cell
+def _(
+    bikes,
+    bmb,
+    idata_poly4,
+    idata_poly4_raw,
+    mo,
+    model_poly4,
+    model_poly4_raw,
+    plt,
+):
+    mo.stop("idata_poly4" not in dir(), mo.md("Fit model_poly4 to continue"))
+    _fig, _axes = plt.subplots(1, 2, sharey=True, figsize=(12, 5))
+
+    _axes[0].scatter(bikes['hour'], bikes['rented'], s=10)
+    _axes[1].scatter(bikes['hour'], bikes['rented'], s=10)
+
+    _p1 = bmb.interpret.plot_predictions(
+            model_poly4_raw,
+            idata_poly4_raw,
+            conditional="hour",
+            # target='rented',
+            fig_kwargs={
+                "xlabel": "Hour",
+                "ylabel": "Rented",
+                "title": "Predictions Raw"
+            }
+        )
+
+    _p2 = bmb.interpret.plot_predictions(
+            model_poly4,
+            idata_poly4,
+            conditional="hour",
+            # target='rented',
+            fig_kwargs={
+                "xlabel": "Hour",
+                "ylabel": "Rented",
+                "title": "Predictions Poly()"
+            }
+        )
+
+    _p1.on(_axes[0]).layout(engine="tight").plot()
+    _p2.on(_axes[1]).layout(engine="tight").plot().show()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercise 4
+
+    Explain in your own words what a distributional model is.
+
+    Ans:
+    """)
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercise 5
+    """)
+    return
+
+
+@app.cell
 def _():
     return
 
 
 @app.cell
 def _():
+
+
     return
 
 
