@@ -521,11 +521,11 @@ def _(mo):
 
 
 @app.cell
-def _(bmb, penguins, rng):
+def _(bmb, penguins):
     # model_int = bmb.Model("body_mass ~ bill_length + bill_depth + bill_length:bill_depth", data=penguins.to_pandas(), dropna=True)
     model_int = bmb.Model("body_mass ~ scale(bill_length) * scale(bill_depth)", data=penguins.to_pandas(), dropna=True)
-    idata_int = model_int.fit(random_seed=rng)
-    return idata_int, model_int
+    # idata_int = model_int.fit(random_seed=rng)
+    return (model_int,)
 
 
 @app.cell
@@ -567,7 +567,8 @@ def _(bmb, idata_int, mo, model_int, np, penguins, plt):
 
 
 @app.cell
-def _(bmb, idata_int, model_int):
+def _(bmb, idata_int, mo, model_int):
+    mo.stop("idata_int" not in dir(), mo.md("Fit model_int to continue"))
     bmb.interpret.plot_comparisons(
         model=model_int,
         idata=idata_int,
@@ -578,7 +579,8 @@ def _(bmb, idata_int, model_int):
 
 
 @app.cell
-def _(bmb, idata_int, model_int):
+def _(bmb, idata_int, mo, model_int):
+    mo.stop("idata_int" not in dir(), mo.md("Fit model_int to continue"))
     bmb.interpret.plot_slopes(
         model=model_int,
         idata=idata_int,
@@ -647,10 +649,10 @@ def _(Path, pl):
 
 
 @app.cell
-def _(bmb, body_fat, rng):
+def _(bmb, body_fat):
     body_fat_model = bmb.Model("siri ~ age + weight + height + abdomen + thigh + wrist", data=body_fat.to_pandas())
-    body_fat_idata = body_fat_model.fit(random_seed=rng, idata_kwargs={'log_likelihood': True})
-    return body_fat_idata, body_fat_model
+    # body_fat_idata = body_fat_model.fit(random_seed=rng, idata_kwargs={'log_likelihood': True})
+    return (body_fat_model,)
 
 
 @app.cell
@@ -662,7 +664,8 @@ def _(body_fat_idata, body_fat_model, kpt, mo):
 
 
 @app.cell
-def _(body_fat_ppi, kpt):
+def _(body_fat_ppi, kpt, mo):
+    mo.stop("body_fat_idata" not in dir(), mo.md("Fit body_fat_model to continue"))
     kpt.plot_compare(
         body_fat_ppi.compare(),
         figure_kwargs={'figsize':(12, 5)}
@@ -699,7 +702,7 @@ def _(bikes, bmb):
         priors = {
             'temperature': bmb.Prior('HalfNormal', sigma=1)
         }
-    
+
         model_t = bmb.Model("rented ~ temperature", bikes.to_pandas(), priors=priors, family="negativebinomial")
         # idata_t = model_t.fit(random_seed=rng)
         return model_t
@@ -810,13 +813,16 @@ def _(mo):
 
     Explain in your own words what a distributional model is.
 
-    Ans:
+    **ANS:**
+
+    A statistical model has some parts to it. Namely
+
+    - **Likelihood** => the distribution or mathematical model that you believe your data come from or behave like. Could be a line, an exponential, an inverse function and so on.
+    - **Priors** => The plausible region/values that you believe the parameters of your model (likelihood) can take before you have access to any data. In the case of a linear model with a Gaussian likelihhod, this would be the values for the mean and the standard deviation.
+    - **Distributional Model** => In a distributional model, you also allow parameters other than the mean to vary based on the data. For example, we could allow the standard deviation to also be a linear function instead of being constant for each data value. These models are useful to describe data with varying variance.
+
+    These can be used in many contexts (random trees, XGBoost, and so on. Not only linear models.)
     """)
-    return
-
-
-@app.cell
-def _():
     return
 
 
@@ -824,19 +830,51 @@ def _():
 def _(mo):
     mo.md(r"""
     ## Exercise 5
+
+    Expand model_spline to a distributional model. Use another spline to model the α parameter of the NegativeBinomial family.
+    """)
+    return
+
+
+@app.cell
+def _(bikes, bmb, np, rng):
+    def ex5():
+        n_knots = 6
+        knots = np.quantile(bikes['hour'], np.linspace(0, 1, n_knots))
+
+        formula = bmb.Formula(
+            "rented ~ 0 + bs(hour, df=8, intercept=True, degree=3)",
+            "alpha ~ 0 + bs(hour, df=8, intercept=True, degree=3)"
+        )
+
+        model_h = bmb.Model(formula, bikes.to_pandas(), family="negativebinomial")
+        idata_h = model_h.fit(random_seed=rng)
+
+        return model_h, idata_h
+
+    # model_hour, idata_hour = ex5()
+    return
+
+
+@app.cell
+def _(bmb, idata_hour, mo, model_hour):
+    mo.stop("model_hour" not in dir(), mo.md("Fit model_hour to continue"))
+    bmb.interpret.plot_predictions(model_hour, idata_hour, conditional='hour').show()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercise 6
+
+    Create a model named model_p2 for the body_mass with the predictors bill_length, bill_depth, flipper_length, and species.
     """)
     return
 
 
 @app.cell
 def _():
-    return
-
-
-@app.cell
-def _():
-
-
     return
 
 
